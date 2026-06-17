@@ -14,12 +14,14 @@ class TurnoMedico extends Model
         'dia_numero', 'dia_semana', 'codigo_turno',
         'horas_diurnas', 'horas_nocturnas', 'horas_total',
         'es_fin_semana', 'es_domingo',
+        'fila_excel', 'columna_excel', 'estado_validacion', 'observacion', 'es_codigo_no_oficial',
     ];
 
     protected $casts = [
-        'fecha'         => 'date',
-        'es_fin_semana' => 'boolean',
-        'es_domingo'    => 'boolean',
+        'fecha'               => 'date',
+        'es_fin_semana'       => 'boolean',
+        'es_domingo'          => 'boolean',
+        'es_codigo_no_oficial'=> 'boolean',
     ];
 
     public function medico(): BelongsTo
