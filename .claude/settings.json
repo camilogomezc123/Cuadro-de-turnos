@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\"; $log = Get-Content \"storage\\\\logs\\\\laravel.log\" -Raw; $inicio = $log.LastIndexOf\\('\"message\"'\\); $log.Substring\\([Math]::Max\\(0, $inicio - 100\\), [Math]::Min\\(400, $log.Length - $inicio + 100\\)\\))",
+      "PowerShell(cd \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\"; $log = Get-Content \"storage\\\\logs\\\\laravel.log\" -Raw; $start = $log.LastIndexOf\\(\"[2026\"\\); $log.Substring\\($start, [Math]::Min\\(800, $log.Length - $start\\)\\))",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\planificacion\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\de-turno-ahora\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\alertas\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\ausencias\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\cambios-turno\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\semanas-molde\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\configuracion\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8080/archivos\" -UseBasicParsing -TimeoutSec 10; Write-Host \"OK [$\\($r.StatusCode\\)] /archivos\" } catch { Write-Host \"FAIL: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(if \\(-not \\(Test-Path \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\calendario\"\\)\\) { New-Item -ItemType Directory -Path \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\calendario\" }; if \\(-not \\(Test-Path \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\formato-inicial\"\\)\\) { New-Item -ItemType Directory -Path \"c:\\\\xampp\\\\htdocs\\\\Cuadro de turnos\\\\resources\\\\views\\\\formato-inicial\" }; Write-Host \"Dirs OK\")",
+      "PowerShell(winget install --id Git.Git -e --silent --accept-source-agreements --accept-package-agreements 2>&1)"
+    ]
+  }
+}
