@@ -168,9 +168,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
         Route::put('/configuracion/cobertura/{uci}', [ConfiguracionController::class, 'actualizarCobertura'])->name('configuracion.cobertura');
 
-        // Médicos (maestro)
-        Route::get('/medicos',         [MedicoController::class, 'index'])->name('medicos.index');
-        Route::get('/medicos/{medico}',[MedicoController::class, 'show']) ->name('medicos.show');
+        // Médicos (maestro) — rutas específicas ANTES del wildcard {medico}
+        Route::get('/medicos',                  [MedicoController::class, 'index'])->name('medicos.index');
+        Route::get('/medicos/duplicados',        [MedicoDuplicadoController::class, 'index'])        ->name('medicos.duplicados.index');
+        Route::post('/medicos/duplicados/fusionar',      [MedicoDuplicadoController::class, 'fusionar'])     ->name('medicos.duplicados.fusionar');
+        Route::post('/medicos/duplicados/fusionar-todos',[MedicoDuplicadoController::class, 'fusionarTodos'])->name('medicos.duplicados.fusionar-todos');
+        Route::get('/medicos/{medico}',         [MedicoController::class, 'show']) ->name('medicos.show');
 
         // Usuarios
         Route::get('/usuarios',                       [AuthController::class, 'usuarios'])           ->name('usuarios.index');
@@ -179,10 +182,5 @@ Route::middleware('auth')->group(function () {
         Route::delete('/usuarios/{usuario}',          [AuthController::class, 'eliminarUsuario'])     ->name('usuarios.eliminar');
         Route::patch('/usuarios/{usuario}/password',  [AuthController::class, 'cambiarPassword'])     ->name('usuarios.password');
         Route::patch('/usuarios/{usuario}/toggle',    [AuthController::class, 'toggleUsuario'])       ->name('usuarios.toggle');
-
-        // Deduplicación de médicos
-        Route::get('/medicos/duplicados',             [MedicoDuplicadoController::class, 'index'])        ->name('medicos.duplicados.index');
-        Route::post('/medicos/duplicados/fusionar',   [MedicoDuplicadoController::class, 'fusionar'])     ->name('medicos.duplicados.fusionar');
-        Route::post('/medicos/duplicados/fusionar-todos', [MedicoDuplicadoController::class, 'fusionarTodos'])->name('medicos.duplicados.fusionar-todos');
     });
 });
