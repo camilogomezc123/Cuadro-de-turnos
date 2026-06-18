@@ -306,16 +306,29 @@ class TurnoEditorController extends Controller
         // Buscar o crear médico — búsqueda global por nombre (mismo médico puede tener turnos en varias UCIs)
         $medicoId = $request->medico_id;
         if (!$medicoId && $request->nombre_nuevo) {
-            $nombreBuscar  = trim($request->nombre_nuevo);
-            $apellidoBuscar= trim($request->apellido_nuevo ?? '');
-            // Buscar coincidencia exacta en cualquier UCI
-            $medico = Medico::where('nombre', $nombreBuscar)
-                ->when($apellidoBuscar, fn($q) => $q->where('apellido', $apellidoBuscar))
+            $nombreBuscar   = trim($request->nombre_nuevo);
+            $apellidoBuscar = trim($request->apellido_nuevo ?? '');
+
+            // Búsqueda case-insensitive para evitar duplicados por mayúsculas/minúsculas
+            $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombreBuscar)])
+                ->when($apellidoBuscar,
+                    fn($q) => $q->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellidoBuscar)])
+                )
                 ->first();
+
+            if (!$medico) {
+                // Intentar coincidencia de nombre completo
+                $fullName = $apellidoBuscar ? "$nombreBuscar $apellidoBuscar" : $nombreBuscar;
+                $medico = Medico::whereRaw(
+                    "LOWER(TRIM(CONCAT(nombre,' ',IFNULL(apellido,'')))) = ?",
+                    [strtolower(trim($fullName))]
+                )->first();
+            }
+
             if (!$medico) {
                 $medico = Medico::create([
-                    'nombre'   => $nombreBuscar,
-                    'apellido' => $apellidoBuscar,
+                    'nombre'   => mb_convert_case($nombreBuscar,   MB_CASE_TITLE, 'UTF-8'),
+                    'apellido' => mb_convert_case($apellidoBuscar, MB_CASE_TITLE, 'UTF-8'),
                     'uci_id'   => $uci->id,
                     'activo'   => true,
                 ]);
@@ -489,7 +502,13 @@ class TurnoEditorController extends Controller
 
         $medicoNuevoId = $request->medico_nuevo_id;
         if (!$medicoNuevoId && $request->nombre_nuevo) {
-            $mNuevo        = Medico::firstOrCreate(['nombre' => trim($request->nombre_nuevo)], ['uci_id'=>$turno->uci_id,'activo'=>true]);
+            $nomNuevo = trim($request->nombre_nuevo);
+            $mNuevo   = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nomNuevo)])->first()
+                ?? Medico::create([
+                    'nombre'  => mb_convert_case($nomNuevo, MB_CASE_TITLE, 'UTF-8'),
+                    'uci_id'  => $turno->uci_id,
+                    'activo'  => true,
+                ]);
             $medicoNuevoId = $mNuevo->id;
         }
 

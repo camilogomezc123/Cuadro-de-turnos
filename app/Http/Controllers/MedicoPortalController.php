@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class MedicoPortalController extends Controller
 {
@@ -355,6 +356,36 @@ class MedicoPortalController extends Controller
         ]);
 
         return back()->with('success', 'Cambio rechazado.');
+    }
+
+    // ── Actualizar credenciales propias (usuario/contraseña) ────────
+
+    public function actualizarCredenciales(Request $request)
+    {
+        $this->requireMedico();
+        $user = Auth::user();
+
+        $request->validate([
+            'name'             => 'required|string|max:100',
+            'email'            => 'required|email|unique:users,email,'.$user->id,
+            'password_actual'  => 'required',
+            'password'         => 'nullable|min:6|confirmed',
+        ]);
+
+        if (!Hash::check($request->password_actual, $user->password)) {
+            return back()->with('cred_error', 'La contraseña actual es incorrecta.')->withInput();
+        }
+
+        $data = [
+            'name'  => $request->name,
+            'email' => $request->email,
+        ];
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $user->update($data);
+        return back()->with('cred_success', 'Tus credenciales han sido actualizadas.');
     }
 
     // ── API: turnos de un médico para un mes ─────────────────────

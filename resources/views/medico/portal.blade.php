@@ -85,19 +85,25 @@
         </h4>
         <small class="text-muted">{{ $medico->uci?->nombre ?? 'Varias UCIs' }}</small>
     </div>
-    <form class="d-flex gap-2 align-items-center">
-        <select name="mes" class="form-select form-select-sm" style="width:130px">
-            @foreach($meses as $i=>$m)
-                <option value="{{ $i+1 }}" @selected($mes==$i+1)>{{ $m }}</option>
-            @endforeach
-        </select>
-        <select name="anio" class="form-select form-select-sm" style="width:85px">
-            @foreach($mesesDisponibles->pluck('anio')->unique()->sortDesc() as $y)
-                <option value="{{ $y }}" @selected($anio==$y)>{{ $y }}</option>
-            @endforeach
-        </select>
-        <button class="btn btn-sm btn-primary">Ver</button>
-    </form>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <form class="d-flex gap-2 align-items-center">
+            <select name="mes" class="form-select form-select-sm" style="width:130px">
+                @foreach($meses as $i=>$m)
+                    <option value="{{ $i+1 }}" @selected($mes==$i+1)>{{ $m }}</option>
+                @endforeach
+            </select>
+            <select name="anio" class="form-select form-select-sm" style="width:85px">
+                @foreach($mesesDisponibles->pluck('anio')->unique()->sortDesc() as $y)
+                    <option value="{{ $y }}" @selected($anio==$y)>{{ $y }}</option>
+                @endforeach
+            </select>
+            <button class="btn btn-sm btn-primary">Ver</button>
+        </form>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalCredenciales"
+                title="Cambiar usuario y contraseña">
+            <i class="bi bi-key me-1"></i>Mis credenciales
+        </button>
+    </div>
 </div>
 
 {{-- KPIs --}}
@@ -460,6 +466,78 @@
         </form>
     </div></div>
 </div>
+{{-- ══════ MODAL: MIS CREDENCIALES ══════ --}}
+<div class="modal fade" id="modalCredenciales" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-1">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-key-fill me-2 text-primary"></i>Actualizar mis credenciales
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ route('medico.credenciales') }}">
+                @csrf @method('PATCH')
+                <div class="modal-body">
+
+                    @if(session('cred_success'))
+                    <div class="alert alert-success alert-dismissible fade show py-2">
+                        {{ session('cred_success') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    @endif
+                    @if(session('cred_error'))
+                    <div class="alert alert-danger py-2">{{ session('cred_error') }}</div>
+                    @endif
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nombre de usuario</label>
+                        <input type="text" name="name" class="form-control"
+                               value="{{ old('name', auth()->user()->name) }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Correo electrónico</label>
+                        <input type="email" name="email" class="form-control"
+                               value="{{ old('email', auth()->user()->email) }}" required>
+                    </div>
+                    <hr class="my-3">
+                    <p class="small text-muted mb-2">Deja en blanco si no deseas cambiar la contraseña.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Contraseña actual <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password" name="password_actual" id="pwdActual"
+                                   class="form-control" required placeholder="Contraseña actual">
+                            <button type="button" class="btn btn-outline-secondary" onclick="togglePwd('pwdActual')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Nueva contraseña</label>
+                        <div class="input-group">
+                            <input type="password" name="password" id="pwdNueva"
+                                   class="form-control" placeholder="Mínimo 6 caracteres">
+                            <button type="button" class="btn btn-outline-secondary" onclick="togglePwd('pwdNueva')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold">Confirmar nueva contraseña</label>
+                        <input type="password" name="password_confirmation"
+                               class="form-control" placeholder="Repetir nueva contraseña">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {{-- Modal evaluación burnout --}}
 @include('burnout.encuesta-modal')
 
@@ -467,6 +545,15 @@
 
 @push('scripts')
 <script>
+function togglePwd(id) {
+    const i = document.getElementById(id);
+    if (i) i.type = i.type === 'password' ? 'text' : 'password';
+}
+@if(session('cred_success') || session('cred_error'))
+document.addEventListener('DOMContentLoaded', function() {
+    new bootstrap.Modal(document.getElementById('modalCredenciales')).show();
+});
+@endif
 function abrirOfrecer(id,fecha,codigo){
     document.getElementById('ofertar_turno_id').value=id;
     document.getElementById('ofertar_info').textContent='Turno: '+codigo+' — '+fecha;

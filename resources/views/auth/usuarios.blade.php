@@ -172,28 +172,25 @@
             <h6>Médicos sin acceso <span class="badge bg-warning text-dark ms-1">{{ $medicosSinUsuario->count() }}</span></h6>
         </div>
         <div class="user-card-body p-0">
-            @foreach($medicosSinUsuario->take(8) as $m)
+            <div style="max-height:400px;overflow-y:auto">
+            @foreach($medicosSinUsuario as $m)
             <div class="user-row">
                 <div class="user-avatar" style="background:#f0f4f8;color:#64748b;font-size:.78rem">
                     {{ strtoupper(substr($m->nombre,0,1)) }}{{ strtoupper(substr($m->apellido??'',0,1)) }}
                 </div>
                 <div class="user-info flex-grow-1">
                     <div class="name">{{ $m->nombre_completo }}</div>
-                    <div class="email">{{ $m->uci?->codigo ?? 'Sin UCI' }}</div>
+                    <div class="email">{{ $m->uci?->codigo ?? 'Sin UCI' }}{{ $m->activo ? '' : ' · Inactivo' }}</div>
                 </div>
                 <button class="btn btn-sm btn-outline-primary btn-accion" style="width:auto;padding:4px 10px"
                         onclick="crearParaMedico({{ $m->id }},'{{ addslashes($m->nombre_completo) }}',
-                                 '{{ Str::lower(Str::ascii($m->nombre)) }}@medico.uci.local')"
+                                 '{{ Str::lower(Str::ascii($m->nombre_completo)) }}@medico.uci.local')"
                         title="Crear cuenta">
                     <i class="bi bi-person-plus"></i>
                 </button>
             </div>
             @endforeach
-            @if($medicosSinUsuario->count() > 8)
-            <div class="text-center py-2 text-muted small">
-                + {{ $medicosSinUsuario->count() - 8 }} más sin cuenta
             </div>
-            @endif
         </div>
     </div>
     @endif

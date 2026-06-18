@@ -55,14 +55,12 @@ class AuthController extends Controller
 
         $medicoIdsConUsuario = User::whereNotNull('medico_id')->pluck('medico_id');
 
-        $medicosSinUsuario = Medico::where('activo', true)
-            ->whereNotIn('id', $medicoIdsConUsuario)
+        $medicosSinUsuario = Medico::whereNotIn('id', $medicoIdsConUsuario)
             ->with('uci')
             ->orderBy('nombre')
             ->get();
 
-        $medicosConUsuario = Medico::where('activo', true)
-            ->whereIn('id', $medicoIdsConUsuario)
+        $medicosConUsuario = Medico::whereIn('id', $medicoIdsConUsuario)
             ->with(['uci', 'user'])
             ->orderBy('nombre')
             ->get();
@@ -110,8 +108,9 @@ class AuthController extends Controller
             // Saltar si ya tiene usuario
             if (User::where('medico_id', $medicoId)->exists()) continue;
 
-            // Generar email desde nombre
-            $emailBase = strtolower(str_replace([' ', 'á','é','í','ó','ú','ñ'], ['.',  'a','e','i','o','u','n'], $medico->nombre));
+            // Generar email desde nombre completo
+            $base      = strtolower(str_replace([' ','á','é','í','ó','ú','ü','ñ'],['.','a','e','i','o','u','u','n'], $medico->nombre_completo));
+            $emailBase = preg_replace('/\.+/', '.', trim($base, '.'));
             $email     = $emailBase . '@medico.uci.local';
             $sufijo    = 1;
             while (User::where('email', $email)->exists()) {
