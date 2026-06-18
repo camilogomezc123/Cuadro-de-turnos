@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const wrap = document.createElement('div');
             wrap.className = 'mb-4 p-3 rounded border';
             wrap.innerHTML = `
-              <label class="form-label fw-semibold mb-3">${p.orden}. ${p.texto_pregunta}</label>
+              <label class="form-label fw-semibold mb-3">${p.orden}. ${p.texto || p.texto_pregunta || ''}</label>
               <div class="d-flex gap-3 flex-wrap justify-content-start">
                 ${[0,1,2,3,4,5,6].map(v => `
                   <div class="text-center">

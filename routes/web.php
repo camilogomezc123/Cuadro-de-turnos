@@ -37,6 +37,7 @@ Route::middleware('auth')->prefix('mi-portal')->name('medico.')->group(function 
     Route::patch('/responder-cambio/{solicitud}',          [MedicoPortalController::class, 'responderCambio'])->name('responder-cambio');
     Route::delete('/cancelar-cambio/{solicitud}',          [MedicoPortalController::class, 'cancelarCambio'])->name('cancelar-cambio');
     Route::get('/turnos-medico',                           [MedicoPortalController::class, 'turnosMedico'])  ->name('turnos-api');
+    Route::get('/candidatos-cambio',                       [MedicoPortalController::class, 'candidatosCambio'])->name('candidatos-api');
     Route::patch('/credenciales',                          [MedicoPortalController::class, 'actualizarCredenciales'])->name('credenciales');
 });
 

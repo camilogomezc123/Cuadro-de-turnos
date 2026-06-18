@@ -431,13 +431,29 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Mi turno</label>
-                        <select name="turno_origen_id" class="form-select" required>
+                        <select name="turno_origen_id" id="turnoOrigen" class="form-select" required>
                             <option value="">Seleccione...</option>
                             @foreach($misTurnos->filter(fn($t)=>$t->esTurnoActivo() && \Carbon\Carbon::parse($t->fecha)->isFuture()) as $t)
                                 <option value="{{ $t->id }}">{{ $t->fecha->format('d/m') }} — {{ $t->codigo_turno }} ({{ $t->uci?->codigo }})</option>
                             @endforeach
                         </select>
                     </div>
+
+                    {{-- Candidatos sugeridos --}}
+                    <div class="col-12" id="divCandidatos" style="display:none">
+                        <label class="form-label fw-bold text-primary">
+                            <i class="bi bi-people-fill me-1"></i>
+                            <span id="lblCandidatos">Candidatos sugeridos</span>
+                        </label>
+                        <div id="listaCandidatos" class="border rounded p-2"
+                             style="max-height:160px;overflow-y:auto;background:#f8faff">
+                            <div class="text-center text-muted small py-2">
+                                <div class="spinner-border spinner-border-sm me-1"></div>Buscando candidatos...
+                            </div>
+                        </div>
+                        <div class="form-text">Haga clic en un candidato para seleccionarlo automáticamente.</div>
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Médico receptor</label>
                         <select name="medico_receptor_id" id="medicoReceptor" class="form-select" required>
@@ -560,6 +576,8 @@ function abrirOfrecer(id,fecha,codigo){
     new bootstrap.Modal(document.getElementById('modalOfrecer')).show();
 }
 const MES={{ $mes }}, ANIO={{ $anio }};
+
+// ── Turnos del receptor ──────────────────────────────────────────
 function cargarTurnosReceptor() {
     const medicoId = document.getElementById('medicoReceptor')?.value;
     const tipo     = document.getElementById('tipoMov')?.value;
@@ -587,6 +605,90 @@ function cargarTurnosReceptor() {
         });
 }
 
+// ── Candidatos sugeridos ─────────────────────────────────────────
+function cargarCandidatos() {
+    const turnoId = document.getElementById('turnoOrigen')?.value;
+    const tipo    = document.getElementById('tipoMov')?.value;
+    const div     = document.getElementById('divCandidatos');
+    const lista   = document.getElementById('listaCandidatos');
+    const lbl     = document.getElementById('lblCandidatos');
+    if (!turnoId || !div) return;
+
+    div.style.display = '';
+    lista.innerHTML   = '<div class="text-center text-muted small py-2"><div class="spinner-border spinner-border-sm me-1"></div>Buscando candidatos...</div>';
+
+    if (tipo === 'cambio_directo') {
+        lbl.textContent = 'Candidatos para intercambio (tienen turno ese mismo día)';
+    } else {
+        lbl.textContent = 'Candidatos para donación (médicos disponibles ese día)';
+    }
+
+    fetch(`{{ route('medico.candidatos-api') }}?turno_id=${turnoId}&tipo=${tipo}`)
+        .then(r => r.json())
+        .then(candidatos => {
+            if (!candidatos.length) {
+                lista.innerHTML = '<div class="text-center text-muted small py-2">No se encontraron candidatos para ese día.</div>';
+                return;
+            }
+
+            const colorMap = {M:'#BBDEFB',T:'#C8E6C9',MT:'#FFE0B2',N:'#D1C4E9',MTN:'#F48FB1',MN:'#FCE4EC',LIBRE:'#e8eef7'};
+            lista.innerHTML = candidatos.map(c => `
+                <div class="d-flex align-items-center gap-2 p-2 rounded mb-1 candidato-item"
+                     style="cursor:pointer;border:1px solid #e0e7f0;background:#fff"
+                     onclick="seleccionarCandidato(${c.medico_id},'${c.nombre}',${c.turno_id||'null'},'${c.codigo_turno}')">
+                    <span class="badge rounded-pill px-2" style="background:${colorMap[c.codigo_turno]||'#eee'};color:#333;min-width:40px;font-size:.7rem">
+                        ${c.codigo_turno}
+                    </span>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold small">${c.nombre}</div>
+                        <div class="text-muted" style="font-size:.7rem">UCI ${c.uci}</div>
+                    </div>
+                    <i class="bi bi-arrow-right-circle text-primary"></i>
+                </div>`).join('');
+        })
+        .catch(() => { lista.innerHTML = '<div class="text-danger small py-1">Error al buscar candidatos.</div>'; });
+}
+
+function seleccionarCandidato(medicoId, nombre, turnoId, codigo) {
+    // Marcar visual
+    document.querySelectorAll('.candidato-item').forEach(el => {
+        el.style.background = '#fff';
+        el.style.borderColor = '#e0e7f0';
+    });
+    event.currentTarget.style.background = '#e8f4ff';
+    event.currentTarget.style.borderColor = '#2196F3';
+
+    // Llenar select médico
+    const sel = document.getElementById('medicoReceptor');
+    if (sel) { sel.value = medicoId; }
+
+    // Si hay turno_id (cambio_directo), actualizar turnos del receptor y preseleccionar
+    const tipo = document.getElementById('tipoMov')?.value;
+    if (tipo === 'cambio_directo') {
+        cargarTurnosReceptorConPreseleccion(medicoId, turnoId);
+    }
+}
+
+function cargarTurnosReceptorConPreseleccion(medicoId, preseleccionarTurnoId) {
+    const sel = document.getElementById('turnoDest');
+    const div = document.getElementById('divTurnoDest');
+    if (!sel || !div) return;
+    div.style.opacity = '1';
+    sel.required = true;
+    sel.innerHTML = '<option>Cargando...</option>';
+    fetch(`{{ route('medico.turnos-api') }}?medico_id=${medicoId}&mes=${MES}&anio=${ANIO}`)
+        .then(r => r.json()).then(ts => {
+            if (!ts.length) {
+                sel.innerHTML = '<option value="">Sin turnos este mes</option>';
+                return;
+            }
+            sel.innerHTML = '<option value="">Seleccione turno del receptor...</option>' +
+                ts.map(t => `<option value="${t.id}" ${t.id==preseleccionarTurnoId?'selected':''}>${t.label}</option>`).join('');
+        });
+}
+
+// ── Eventos ──────────────────────────────────────────────────────
+document.getElementById('turnoOrigen')?.addEventListener('change', cargarCandidatos);
 document.getElementById('medicoReceptor')?.addEventListener('change', cargarTurnosReceptor);
 document.getElementById('tipoMov')?.addEventListener('change', function() {
     const don = this.value === 'donacion_directa';
@@ -596,6 +698,10 @@ document.getElementById('tipoMov')?.addEventListener('change', function() {
         document.getElementById('turnoDest').required = false;
     } else {
         cargarTurnosReceptor();
+    }
+    // Recargar candidatos al cambiar el tipo
+    if (document.getElementById('turnoOrigen')?.value) {
+        cargarCandidatos();
     }
 });
 </script>

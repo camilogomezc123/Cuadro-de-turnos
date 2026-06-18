@@ -358,6 +358,66 @@ class MedicoPortalController extends Controller
         return back()->with('success', 'Cambio rechazado.');
     }
 
+    // ── API: candidatos sugeridos para cambio/donación ──────────────
+
+    public function candidatosCambio(Request $request)
+    {
+        $this->requireMedico();
+        $medico = Auth::user()->medico;
+
+        $turnoId = (int)$request->turno_id;
+        $tipo    = $request->tipo ?? 'cambio_directo';
+
+        if ($turnoId && $tipo === 'cambio_directo') {
+            $turno = TurnoMedico::find($turnoId);
+            if (!$turno) return response()->json([]);
+
+            // Médicos con turno en la misma fecha (candidatos para intercambio)
+            $candidatos = TurnoMedico::where('fecha', $turno->fecha)
+                ->where('medico_id', '!=', $medico->id)
+                ->whereNotIn('codigo_turno', ['', 'LIBRE', 'VAC'])
+                ->where('horas_total', '>', 0)
+                ->with(['medico', 'uci'])
+                ->get()
+                ->groupBy('medico_id')
+                ->map(fn($ts) => [
+                    'medico_id'    => $ts->first()->medico_id,
+                    'nombre'       => $ts->first()->medico?->nombre_completo ?? '—',
+                    'turno_id'     => $ts->first()->id,
+                    'codigo_turno' => $ts->first()->codigo_turno,
+                    'uci'          => $ts->first()->uci?->codigo ?? '—',
+                    'horas'        => $ts->first()->horas_total,
+                ])
+                ->values();
+        } else {
+            // Para donación: cualquier médico activo (sin turno en ese día o con libre)
+            $fecha = $turnoId ? (TurnoMedico::find($turnoId)?->fecha ?? now()->toDateString()) : now()->toDateString();
+
+            $medicosConTurno = TurnoMedico::where('fecha', $fecha)
+                ->where('medico_id', '!=', $medico->id)
+                ->whereNotIn('codigo_turno', ['', 'LIBRE', 'VAC'])
+                ->pluck('medico_id');
+
+            $candidatos = Medico::where('activo', true)
+                ->where('id', '!=', $medico->id)
+                ->whereNotIn('id', $medicosConTurno)
+                ->with('uci')
+                ->orderBy('nombre')
+                ->get()
+                ->map(fn($m) => [
+                    'medico_id'    => $m->id,
+                    'nombre'       => $m->nombre_completo,
+                    'turno_id'     => null,
+                    'codigo_turno' => 'LIBRE',
+                    'uci'          => $m->uci?->codigo ?? '—',
+                    'horas'        => 0,
+                ])
+                ->values();
+        }
+
+        return response()->json($candidatos);
+    }
+
     // ── Actualizar credenciales propias (usuario/contraseña) ────────
 
     public function actualizarCredenciales(Request $request)
