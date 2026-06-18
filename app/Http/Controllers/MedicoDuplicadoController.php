@@ -151,40 +151,51 @@ class MedicoDuplicadoController extends Controller
 
     private function detectarDuplicados(): array
     {
-        // Agrupa por nombre completo normalizado (nombre + apellido en una sola cadena)
-        // Esto detecta tanto "DIEGO ESCOBAR"/NULL como "Diego"/"Escobar"
-        $rawGrupos = DB::select("
-            SELECT
-                LOWER(TRIM(CONCAT_WS(' ', nombre, NULLIF(TRIM(IFNULL(apellido,'')),''))) ) AS full_key,
-                GROUP_CONCAT(id ORDER BY id) AS ids,
-                COUNT(*) AS total
-            FROM medicos
-            GROUP BY LOWER(TRIM(CONCAT_WS(' ', nombre, NULLIF(TRIM(IFNULL(apellido,'')),''))) )
-            HAVING COUNT(*) > 1
-        ");
+        // Carga todos los médicos y agrupa en PHP para evitar SQL crudo complejo
+        $todos = Medico::with('uci')->get();
 
-        $grupos = [];
-        foreach ($rawGrupos as $g) {
-            $ids    = explode(',', $g->ids);
-            $medicos = Medico::whereIn('id', $ids)
-                ->with('uci')
-                ->get()
-                ->map(fn($m) => [
-                    'id'              => $m->id,
-                    'nombre'          => $m->nombre,
-                    'apellido'        => $m->apellido,
-                    'nombre_completo' => $m->nombre_completo,
-                    'uci'             => $m->uci?->codigo ?? '—',
-                    'activo'          => $m->activo,
-                    'total_turnos'    => DB::table('turno_medicos')->where('medico_id', $m->id)->count(),
-                    'tiene_user'      => DB::table('users')->where('medico_id', $m->id)->exists(),
-                ]);
+        // Conteo de turnos y usuarios en una sola consulta para eficiencia
+        $turnosPorMedico = DB::table('turno_medicos')
+            ->select('medico_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('medico_id')
+            ->pluck('total', 'medico_id');
 
-            $grupos[] = [
-                'llave'   => $g->full_key,
-                'medicos' => $medicos->sortByDesc('total_turnos')->values()->toArray(),
+        $usuariosPorMedico = DB::table('users')
+            ->whereNotNull('medico_id')
+            ->pluck('medico_id')
+            ->flip();
+
+        // Agrupar por nombre completo normalizado
+        $porClave = [];
+        foreach ($todos as $m) {
+            $key = self::nombreFullKey($m->nombre, $m->apellido);
+            $porClave[$key][] = [
+                'id'              => $m->id,
+                'nombre'          => $m->nombre,
+                'apellido'        => $m->apellido,
+                'nombre_completo' => $m->nombre_completo,
+                'uci'             => $m->uci?->codigo ?? '—',
+                'activo'          => $m->activo,
+                'total_turnos'    => (int)($turnosPorMedico[$m->id] ?? 0),
+                'tiene_user'      => isset($usuariosPorMedico[$m->id]),
             ];
         }
+
+        $grupos = [];
+        foreach ($porClave as $key => $medicos) {
+            if (count($medicos) <= 1) continue;
+
+            // Ordenar: primero el que tiene más turnos
+            usort($medicos, fn($a, $b) => $b['total_turnos'] <=> $a['total_turnos']);
+
+            $grupos[] = [
+                'llave'   => $key,
+                'medicos' => $medicos,
+            ];
+        }
+
+        // Ordenar grupos por nombre
+        usort($grupos, fn($a, $b) => strcmp($a['llave'], $b['llave']));
 
         return $grupos;
     }
