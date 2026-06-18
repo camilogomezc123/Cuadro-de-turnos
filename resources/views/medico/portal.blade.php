@@ -23,26 +23,57 @@
 @section('content')
 <div class="fade-in">
 
-{{-- Alerta 200h --}}
-@if($supera200)
-<div class="alert alert-danger d-flex gap-3 align-items-center mb-4">
-    <i class="bi bi-exclamation-octagon-fill fs-3"></i>
-    <div><strong>¡Alerta!</strong> Supera las 200h programadas este mes
-    ({{ number_format($resumen['horas_reconocidas'],1) }}h). Revise con coordinación.</div>
-</div>
-@endif
+{{-- ══════ PANEL DE ALERTAS PRIORITARIAS ══════ --}}
+@php
+    $tieneAlertasCriticas = $supera200 || $alertas12h->isNotEmpty() || $pendientesRecibidas > 0;
+@endphp
+@if($tieneAlertasCriticas)
+<div class="card border-0 mb-4" style="border-left:5px solid #dc3545 !important;box-shadow:0 4px 20px rgba(220,53,69,.2)">
+    <div class="card-header border-0 py-2" style="background:linear-gradient(90deg,#fff5f5,#fff);border-left:5px solid #dc3545">
+        <span class="fw-bold text-danger"><i class="bi bi-bell-fill me-2"></i>Notificaciones pendientes — requieren su atención</span>
+    </div>
+    <div class="card-body py-2 px-3">
 
-@foreach($alertas12h as $al)
-<div class="alert alert-warning d-flex gap-2 align-items-center mb-2">
-    <i class="bi bi-clock-history"></i> {{ $al->mensaje_medico ?? $al->mensaje }}
-</div>
-@endforeach
+        @if($supera200)
+        <div class="d-flex align-items-center gap-3 py-2 border-bottom">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width:38px;height:38px;background:#fee2e2">
+                <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+            </div>
+            <div>
+                <div class="fw-semibold text-danger">Exceso de horas mensuales</div>
+                <div class="text-muted small">Tiene <strong>{{ number_format($resumen['horas_reconocidas'],1) }}h</strong> programadas — supera el límite de 200h. Coordine con el administrador.</div>
+            </div>
+        </div>
+        @endif
 
-@if($pendientesRecibidas > 0)
-<div class="alert alert-info d-flex gap-2 align-items-center mb-4">
-    <i class="bi bi-bell-fill fs-5"></i>
-    Tiene <strong class="ms-1">{{ $pendientesRecibidas }}</strong> solicitud(es) pendiente(s) de responder.
-    <a href="#tab-recibidas" class="alert-link ms-2">Ver →</a>
+        @foreach($alertas12h as $al)
+        <div class="d-flex align-items-center gap-3 py-2 border-bottom">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width:38px;height:38px;background:#fff3cd">
+                <i class="bi bi-clock-history text-warning fs-5"></i>
+            </div>
+            <div class="fw-semibold small">{{ $al->mensaje_medico ?? $al->mensaje }}</div>
+        </div>
+        @endforeach
+
+        @if($pendientesRecibidas > 0)
+        <div class="d-flex align-items-center gap-3 py-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width:38px;height:38px;background:#dbeafe">
+                <i class="bi bi-arrow-left-right text-primary fs-5"></i>
+            </div>
+            <div>
+                <div class="fw-semibold">Solicitudes de cambio pendientes</div>
+                <div class="text-muted small">
+                    Tiene <strong>{{ $pendientesRecibidas }}</strong> solicitud(es) esperando su respuesta.
+                    <a href="#tab-recibidas" class="ms-1">Ver solicitudes →</a>
+                </div>
+            </div>
+        </div>
+        @endif
+
+    </div>
 </div>
 @endif
 
@@ -429,6 +460,9 @@
         </form>
     </div></div>
 </div>
+{{-- Modal evaluación burnout --}}
+@include('burnout.encuesta-modal')
+
 @endsection
 
 @push('scripts')

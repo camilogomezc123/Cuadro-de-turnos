@@ -303,15 +303,23 @@ class TurnoEditorController extends Controller
         $mes  = (int)$request->mes;
         $anio = (int)$request->anio;
 
-        // Crear médico si es nuevo
+        // Buscar o crear médico — búsqueda global por nombre (mismo médico puede tener turnos en varias UCIs)
         $medicoId = $request->medico_id;
         if (!$medicoId && $request->nombre_nuevo) {
-            $medico   = Medico::create([
-                'nombre'   => trim($request->nombre_nuevo),
-                'apellido' => trim($request->apellido_nuevo ?? ''),
-                'uci_id'   => $uci->id,
-                'activo'   => true,
-            ]);
+            $nombreBuscar  = trim($request->nombre_nuevo);
+            $apellidoBuscar= trim($request->apellido_nuevo ?? '');
+            // Buscar coincidencia exacta en cualquier UCI
+            $medico = Medico::where('nombre', $nombreBuscar)
+                ->when($apellidoBuscar, fn($q) => $q->where('apellido', $apellidoBuscar))
+                ->first();
+            if (!$medico) {
+                $medico = Medico::create([
+                    'nombre'   => $nombreBuscar,
+                    'apellido' => $apellidoBuscar,
+                    'uci_id'   => $uci->id,
+                    'activo'   => true,
+                ]);
+            }
             $medicoId = $medico->id;
         }
 

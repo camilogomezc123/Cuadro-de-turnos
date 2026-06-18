@@ -319,6 +319,15 @@
             <i class="bi bi-calendar-x"></i> Ausencias / Permisos
         </a>
 
+        <div class="sidebar-section">Bienestar</div>
+        @php $alertasBurnout = \App\Models\BurnoutAlerta::where('estado','activa')->count(); @endphp
+        <a class="nav-link {{ request()->routeIs('burnout.*') ? 'active' : '' }}" href="{{ route('burnout.index') }}">
+            <i class="bi bi-heart-pulse"></i> Burnout
+            @if($alertasBurnout > 0)
+                <span class="nav-badge">{{ $alertasBurnout }}</span>
+            @endif
+        </a>
+
         <div class="sidebar-section">Control</div>
         <a class="nav-link {{ request()->routeIs('alertas.*') ? 'active' : '' }}" href="{{ route('alertas.index') }}">
             <i class="bi bi-exclamation-triangle"></i> Alertas
@@ -435,6 +444,45 @@
             </div>
         @endif
     </div>
+
+    <!-- ALERTAS GLOBALES MAESTRO -->
+    @auth
+    @if(auth()->user()->esMaster())
+    @php
+        $totalAlertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
+        $alertasBurnoutActivas = \App\Models\BurnoutAlerta::where('estado','activa')->where('nivel_riesgo','critico')->count();
+        $cambiosPend           = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+    @endphp
+    @if($totalAlertasAbiertas > 0 || $alertasBurnoutActivas > 0 || $cambiosPend > 0)
+    <div class="px-4 pb-0 pt-1">
+        <div class="alert alert-warning border-warning d-flex gap-3 align-items-center py-2 mb-2" style="border-left:4px solid #f59e0b !important">
+            <i class="bi bi-bell-fill text-warning fs-5 flex-shrink-0"></i>
+            <div class="d-flex gap-3 flex-wrap align-items-center flex-fill">
+                @if($totalAlertasAbiertas > 0)
+                <a href="{{ route('alertas.index') }}" class="text-decoration-none">
+                    <span class="badge bg-danger me-1">{{ $totalAlertasAbiertas }}</span>
+                    <span class="text-dark small">alerta(s) de turno abiertas</span>
+                </a>
+                @endif
+                @if($cambiosPend > 0)
+                <a href="{{ route('cambios-turno.index') }}" class="text-decoration-none">
+                    <span class="badge bg-warning text-dark me-1">{{ $cambiosPend }}</span>
+                    <span class="text-dark small">cambio(s) de turno pendiente(s)</span>
+                </a>
+                @endif
+                @if($alertasBurnoutActivas > 0)
+                <a href="{{ route('burnout.index') }}" class="text-decoration-none">
+                    <span class="badge bg-danger me-1">{{ $alertasBurnoutActivas }}</span>
+                    <span class="text-dark small">alerta(s) críticas de burnout</span>
+                </a>
+                @endif
+            </div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        </div>
+    </div>
+    @endif
+    @endif
+    @endauth
 
     <!-- PAGE CONTENT -->
     <div class="content-area">

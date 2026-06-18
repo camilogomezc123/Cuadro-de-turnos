@@ -8,28 +8,43 @@
 @endsection
 
 @section('content')
-<div class="d-flex align-items-center gap-3 mb-4">
+<div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
     <form method="GET" class="d-flex align-items-center gap-2">
-        <select name="archivo_id" class="form-select form-select-sm" style="width:200px" onchange="this.form.submit()">
-            @foreach($archivos as $a)
-                <option value="{{ $a->id }}" {{ $a->id == $archivoId ? 'selected' : '' }}>{{ $a->nombre_mes }} {{ $a->anio }}</option>
+        <select name="mes" class="form-select form-select-sm" style="width:140px" onchange="this.form.submit()">
+            @foreach($nombresMeses as $i => $nombre)
+                <option value="{{ $i+1 }}" @selected($mes == $i+1)>{{ $nombre }}</option>
             @endforeach
         </select>
+        <select name="anio" class="form-select form-select-sm" style="width:90px" onchange="this.form.submit()">
+            @for($y = now()->year; $y >= now()->year - 3; $y--)
+                <option value="{{ $y }}" @selected($anio == $y)>{{ $y }}</option>
+            @endfor
+        </select>
     </form>
-    <a href="{{ route('ucis.index', ['archivo_id' => $archivoId]) }}" class="btn btn-sm btn-outline-secondary">
+    <a href="{{ route('ucis.index', ['mes' => $mes, 'anio' => $anio]) }}" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-arrow-left me-1"></i>Volver
     </a>
 </div>
 
-@if($indicador)
+@php
+    $totalHoras     = $indicador->total_horas ?? 0;
+    $totalMedicos   = $indicador->total_medicos ?? 0;
+    $totalTurnos    = $indicador->total_turnos ?? 0;
+    $horasNocturnas = $indicador->total_horas_nocturnas ?? 0;
+    $promHoras      = $totalMedicos > 0 ? round($totalHoras / $totalMedicos, 1) : 0;
+    $pctNocturna    = $totalHoras > 0 ? round($horasNocturnas / $totalHoras * 100, 1) : 0;
+    $pctDiurna      = 100 - $pctNocturna;
+@endphp
+
+@if($totalHoras > 0)
 <div class="row g-3 mb-4">
     @php $kpis = [
-        ['Especialistas', $indicador->num_especialistas, 'bi-people-fill', '#E3F2FD', '#1565C0'],
-        ['Horas Totales', number_format($indicador->horas_totales, 1), 'bi-clock-fill', '#E8F5E9', '#2E7D32'],
-        ['Prom/Médico', number_format($indicador->horas_promedio_medico, 1).'h', 'bi-graph-up', '#FFF8E1', '#E65100'],
-        ['Cobertura Mensual', number_format($indicador->cobertura_mensual, 1).'%', 'bi-calendar-check-fill', '#E0F7FA', '#0277BD'],
-        ['Cob. Fin Semana', number_format($indicador->cobertura_fin_semana, 1).'%', 'bi-calendar-heart-fill', '#FCE4EC', '#C62828'],
-        ['Cob. Nocturna', number_format($indicador->cobertura_nocturna, 1).'%', 'bi-moon-stars-fill', '#EDE7F6', '#4527A0'],
+        ['Médicos activos', $totalMedicos,              'bi-people-fill',        '#E3F2FD', '#1565C0'],
+        ['Horas Totales',   number_format($totalHoras, 0), 'bi-clock-fill',      '#E8F5E9', '#2E7D32'],
+        ['Prom/Médico',     $promHoras.'h',             'bi-graph-up',           '#FFF8E1', '#E65100'],
+        ['Turnos programados', $totalTurnos,            'bi-calendar-check-fill','#E0F7FA', '#0277BD'],
+        ['H. Nocturnas',    number_format($horasNocturnas, 0), 'bi-moon-stars-fill','#EDE7F6','#4527A0'],
+        ['% Nocturno',      $pctNocturna.'%',           'bi-pie-chart-fill',    '#FCE4EC', '#C62828'],
     ]; @endphp
     @foreach($kpis as [$label, $val, $icon, $bg, $color])
     <div class="col-6 col-md-4 col-lg-2">
@@ -56,15 +71,25 @@
                 <div class="text-center mt-3">
                     <div class="d-flex justify-content-around">
                         <div>
-                            <div class="fw-bold text-primary">{{ number_format($indicador->carga_diurna_pct, 1) }}%</div>
+                            <div class="fw-bold text-primary">{{ $pctDiurna }}%</div>
                             <div class="text-muted small">Diurna</div>
                         </div>
                         <div>
-                            <div class="fw-bold" style="color:#7C3AED">{{ number_format($indicador->carga_nocturna_pct, 1) }}%</div>
+                            <div class="fw-bold" style="color:#7C3AED">{{ $pctNocturna }}%</div>
                             <div class="text-muted small">Nocturna</div>
                         </div>
                     </div>
                 </div>
+                @if($distribucion->isNotEmpty())
+                <hr class="my-3">
+                <div class="small text-muted mb-1 fw-semibold">Por tipo de turno</div>
+                @foreach($distribucion as $cod => $dist)
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="badge" style="background:var(--bs-secondary-bg);color:inherit">{{ $cod }}</span>
+                    <span class="fw-semibold">{{ $dist->cnt }}</span>
+                </div>
+                @endforeach
+                @endif
             </div>
         </div>
     </div>
@@ -73,35 +98,32 @@
     <div class="col-md-8">
         <div class="panel h-100">
             <div class="panel-header">
-                <span class="panel-title"><i class="bi bi-person-badge me-2 text-success"></i>Médicos de la UCI</span>
+                <span class="panel-title"><i class="bi bi-person-badge me-2 text-success"></i>Médicos — {{ $nombresMeses[$mes-1] }} {{ $anio }}</span>
                 <span class="badge bg-success-subtle text-success">{{ $medicos->count() }}</span>
             </div>
             <div class="panel-body p-0">
                 <div class="table-responsive">
                     <table class="table table-custom mb-0">
                         <thead>
-                            <tr><th>Médico</th><th>Horas</th><th>H. Noct.</th><th>Turnos N</th><th>F/S</th><th>% Ocup.</th></tr>
+                            <tr><th>Médico</th><th class="text-end">Horas</th><th class="text-end">H. Noct.</th><th class="text-end">T. Noct.</th><th class="text-end">F/S</th></tr>
                         </thead>
                         <tbody>
-                            @foreach($medicos as $m)
+                            @forelse($medicos as $m)
                             <tr>
                                 <td>
-                                    <a href="{{ route('medicos.show', ['medico' => $m->medico_id, 'archivo_id' => $archivoId]) }}"
+                                    <a href="{{ route('medicos.show', ['medico' => $m->medico_id, 'mes' => $mes, 'anio' => $anio]) }}"
                                        class="fw-semibold text-decoration-none text-dark">
-                                        {{ $m->medico->nombre }}
+                                        {{ $m->medico?->nombre_completo ?? '—' }}
                                     </a>
                                 </td>
-                                <td><strong>{{ number_format($m->total_horas, 1) }}</strong></td>
-                                <td style="color:#7C3AED">{{ number_format($m->horas_nocturnas, 1) }}</td>
-                                <td><span class="badge-N turno-badge">{{ $m->turnos_n }}</span></td>
-                                <td>{{ $m->turnos_fin_semana }}</td>
-                                <td>
-                                    <div class="progress" style="width:80px">
-                                        <div class="progress-bar bg-primary" style="width:{{ min($m->porcentaje_ocupacion, 100) }}%"></div>
-                                    </div>
-                                </td>
+                                <td class="text-end"><strong>{{ number_format($m->total_horas, 0) }}</strong></td>
+                                <td class="text-end" style="color:#7C3AED">{{ number_format($m->horas_nocturnas, 0) }}</td>
+                                <td class="text-end">{{ $m->turnos_nocturnos }}</td>
+                                <td class="text-end">{{ $m->fines_semana }}</td>
                             </tr>
-                            @endforeach
+                            @empty
+                            <tr><td colspan="5" class="text-center text-muted py-3">Sin médicos registrados</td></tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -112,7 +134,7 @@
 @else
 <div class="panel p-5 text-center text-muted">
     <i class="bi bi-info-circle fs-1 opacity-25 d-block mb-2"></i>
-    No hay indicadores para esta UCI en el período seleccionado.
+    No hay turnos registrados para <strong>{{ $uci->nombre }}</strong> en {{ $nombresMeses[$mes-1] }} {{ $anio }}.
 </div>
 @endif
 
@@ -126,16 +148,19 @@
         <div class="table-responsive">
             <table class="table table-custom mb-0">
                 <thead>
-                    <tr><th>Período</th><th>Especialistas</th><th>Horas Totales</th><th>Cob. Mensual</th><th>Cob. Nocturna</th></tr>
+                    <tr><th>Período</th><th class="text-end">Médicos</th><th class="text-end">Horas Totales</th></tr>
                 </thead>
                 <tbody>
                     @foreach($historial as $h)
                     <tr>
-                        <td>{{ ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][$h->mes] }} {{ $h->anio }}</td>
-                        <td>{{ $h->num_especialistas }}</td>
-                        <td>{{ number_format($h->horas_totales, 1) }}</td>
-                        <td>{{ number_format($h->cobertura_mensual, 1) }}%</td>
-                        <td>{{ number_format($h->cobertura_nocturna, 1) }}%</td>
+                        <td>
+                            <a href="{{ route('ucis.show', ['uci' => $uci->id, 'mes' => $h->mes, 'anio' => $h->anio]) }}"
+                               class="text-decoration-none">
+                                {{ ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][$h->mes] }} {{ $h->anio }}
+                            </a>
+                        </td>
+                        <td class="text-end">{{ $h->medicos }}</td>
+                        <td class="text-end">{{ number_format($h->horas, 0) }}</td>
                     </tr>
                     @endforeach
                 </tbody>
@@ -148,13 +173,13 @@
 
 @push('scripts')
 <script>
-@if($indicador)
+@if($totalHoras > 0)
 new Chart(document.getElementById('chartCarga'), {
     type: 'doughnut',
     data: {
         labels: ['Diurna', 'Nocturna'],
         datasets: [{
-            data: [{{ $indicador->carga_diurna_pct }}, {{ $indicador->carga_nocturna_pct }}],
+            data: [{{ $pctDiurna }}, {{ $pctNocturna }}],
             backgroundColor: ['#2196F3','#7C3AED'],
             borderWidth: 0,
             hoverOffset: 6,

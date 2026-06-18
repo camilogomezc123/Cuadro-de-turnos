@@ -20,6 +20,7 @@ use App\Http\Controllers\SecuenciaUciController;
 use App\Http\Controllers\TurnoEditorController;
 use App\Http\Controllers\UciController;
 use App\Http\Controllers\MedicoPortalController;
+use App\Http\Controllers\BurnoutController;
 use Illuminate\Support\Facades\Route;
 
 // ── Autenticación (públicas) ────────────────────────────────────
@@ -36,6 +37,13 @@ Route::middleware('auth')->prefix('mi-portal')->name('medico.')->group(function 
     Route::patch('/responder-cambio/{solicitud}',          [MedicoPortalController::class, 'responderCambio'])->name('responder-cambio');
     Route::delete('/cancelar-cambio/{solicitud}',          [MedicoPortalController::class, 'cancelarCambio'])->name('cancelar-cambio');
     Route::get('/turnos-medico',                           [MedicoPortalController::class, 'turnosMedico'])  ->name('turnos-api');
+});
+
+// ── Burnout: rutas accesibles por todos los usuarios autenticados ──
+Route::middleware('auth')->prefix('burnout')->name('burnout.')->group(function () {
+    Route::get('/verificar',  [BurnoutController::class, 'verificar']) ->name('verificar');
+    Route::post('/responder', [BurnoutController::class, 'responder']) ->name('responder');
+    Route::post('/posponer',  [BurnoutController::class, 'posponer'])  ->name('posponer');
 });
 
 // ── Rutas protegidas ────────────────────────────────────────────
@@ -139,6 +147,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/reportes/pdf',             [ReporteController::class, 'exportarPdf'])     ->name('reportes.pdf');
         Route::post('/reportes/medico/excel',    [ReporteController::class, 'exportarMedicoExcel'])->name('reportes.medico.excel');
         Route::post('/reportes/medico/pdf',      [ReporteController::class, 'exportarMedicoPdf'])  ->name('reportes.medico.pdf');
+
+        // Burnout (solo maestro: panel admin)
+        Route::get('/burnout',                               [BurnoutController::class, 'index'])            ->name('burnout.index');
+        Route::get('/burnout/preguntas',                     [BurnoutController::class, 'preguntas'])        ->name('burnout.preguntas');
+        Route::patch('/burnout/preguntas/{pregunta}',        [BurnoutController::class, 'actualizarPregunta'])->name('burnout.pregunta.update');
+        Route::post('/burnout/configurar',                   [BurnoutController::class, 'configurar'])       ->name('burnout.configurar');
+        Route::post('/burnout/toggle/{encuesta}',            [BurnoutController::class, 'toggleEncuesta'])   ->name('burnout.toggle');
+        Route::get('/burnout/exportar',                      [BurnoutController::class, 'exportarExcel'])    ->name('burnout.exportar');
+        Route::post('/burnout/alertas/{alerta}/atender',     [BurnoutController::class, 'atenderAlerta'])    ->name('burnout.alertas.atender');
 
         // Configuración
         Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
