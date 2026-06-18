@@ -118,12 +118,18 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Médico <span class="text-danger">*</span></label>
+                        @if($esMaestro)
                         <select name="medico_id" class="form-select" required>
                             <option value="">Seleccione...</option>
-                            @foreach(\App\Models\Medico::where('activo',true)->orderBy('nombre')->get() as $m)
+                            @foreach($medicosLista as $m)
                                 <option value="{{ $m->id }}">{{ $m->nombre_completo }}</option>
                             @endforeach
                         </select>
+                        @else
+                            @php $miMedico = $medicosLista->first() @endphp
+                            <input type="hidden" name="medico_id" value="{{ $miMedico?->id }}">
+                            <input type="text" class="form-control" value="{{ $miMedico?->nombre_completo }}" readonly>
+                        @endif
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Fecha <span class="text-danger">*</span></label>

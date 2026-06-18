@@ -122,27 +122,51 @@ class CambioTurnoController extends Controller
             return back()->with('error', 'El cambio debe estar aceptado por el colega antes de ser aprobado.');
         }
 
-        // Ejecutar el intercambio de turnos
         $tOrigen  = $cambio->turnoOrigen;
         $tDestino = $cambio->turnoDestino;
 
         if ($tOrigen && $tDestino) {
-            // Intercambiar códigos de turno
+            // Intercambiar códigos de turno entre los dos médicos
             [$codigoA, $codigoB] = [$tOrigen->codigo_turno, $tDestino->codigo_turno];
             $horasA = TurnoService::horasPorCodigo($codigoB);
             $horasB = TurnoService::horasPorCodigo($codigoA);
 
-            $tOrigen->update(['codigo_turno' => $codigoB, 'horas_diurnas' => $horasA['diurnas'],
-                'horas_nocturnas' => $horasA['nocturnas'], 'horas_total' => $horasA['total'],
-                'editado_manualmente' => true, 'editado_por' => 'coordinador', 'editado_at' => now()]);
-            $tDestino->update(['codigo_turno' => $codigoA, 'horas_diurnas' => $horasB['diurnas'],
-                'horas_nocturnas' => $horasB['nocturnas'], 'horas_total' => $horasB['total'],
-                'editado_manualmente' => true, 'editado_por' => 'coordinador', 'editado_at' => now()]);
+            $tOrigen->update([
+                'codigo_turno'        => $codigoB,
+                'horas_diurnas'       => $horasA['diurnas'],
+                'horas_nocturnas'     => $horasA['nocturnas'],
+                'horas_total'         => $horasA['total'],
+                'editado_manualmente' => true,
+                'editado_por'         => 'coordinador',
+                'editado_at'          => now(),
+            ]);
+            $tDestino->update([
+                'codigo_turno'        => $codigoA,
+                'horas_diurnas'       => $horasB['diurnas'],
+                'horas_nocturnas'     => $horasB['nocturnas'],
+                'horas_total'         => $horasB['total'],
+                'editado_manualmente' => true,
+                'editado_por'         => 'coordinador',
+                'editado_at'          => now(),
+            ]);
+
+            // Recalcular indicadores (horas del mes) para ambos médicos
+            $fechaO = \Carbon\Carbon::parse($tOrigen->fecha);
+            $fechaD = \Carbon\Carbon::parse($tDestino->fecha);
+
+            $this->turnoService->recalcularIndicadorMedico(
+                $tOrigen->medico_id, $tOrigen->uci_id, $tOrigen->archivo_id,
+                $fechaO->month, $fechaO->year
+            );
+            $this->turnoService->recalcularIndicadorMedico(
+                $tDestino->medico_id, $tDestino->uci_id, $tDestino->archivo_id,
+                $fechaD->month, $fechaD->year
+            );
         }
 
         $cambio->update(['estado' => 'aprobado_coordinador', 'aprobado_por' => 'coordinador', 'resuelto_at' => now()]);
         AuditoriaSistema::registrar('APROBAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
-        return back()->with('success', 'Cambio de turno aprobado y aplicado.');
+        return back()->with('success', 'Cambio de turno aprobado y aplicado. Las horas han sido recalculadas.');
     }
 
     public function rechazar(Request $request, SolicitudCambioTurno $cambio)

@@ -39,7 +39,16 @@ class NovedadController extends Controller
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
         $esMaestro  = $user->esMaster();
 
-        return view('novedades.index', compact('novedades','tipos','mes','anio','meses','esMaestro'));
+        // Médicos disponibles para el formulario: maestro ve todos, operativo solo se ve a sí mismo
+        if ($esMaestro) {
+            $medicosLista = Medico::where('activo', true)->orderBy('nombre')->get();
+        } else {
+            $medicosLista = $user->medico_id
+                ? Medico::where('id', $user->medico_id)->get()
+                : collect();
+        }
+
+        return view('novedades.index', compact('novedades','tipos','mes','anio','meses','esMaestro','medicosLista'));
     }
 
     // Registrar no asistencia a un turno (quita horas)
@@ -136,9 +145,11 @@ class NovedadController extends Controller
         return back()->with('success', 'No asistencia registrada. Las horas han sido descontadas.');
     }
 
-    // Crear novedad manual desde el panel maestro
+    // Crear novedad manual
     public function store(Request $request)
     {
+        $user = Auth::user();
+
         $request->validate([
             'medico_id'          => 'required|exists:medicos,id',
             'fecha'              => 'required|date',
@@ -149,8 +160,14 @@ class NovedadController extends Controller
             'visible_para_medico'=> 'boolean',
         ]);
 
+        // Operativo solo puede registrar novedad de sí mismo
+        $medicoId = ($user->esMedico() && $user->medico_id)
+            ? $user->medico_id
+            : $request->medico_id;
+
         Novedad::create([
-            ...$request->only(['medico_id','fecha','tipo_novedad','descripcion','horas_afectadas','resta_horas','visible_para_medico']),
+            ...$request->only(['fecha','tipo_novedad','descripcion','horas_afectadas','resta_horas','visible_para_medico']),
+            'medico_id'          => $medicoId,
             'usuario_maestro_id' => Auth::id(),
             'estado'             => 'activa',
         ]);
