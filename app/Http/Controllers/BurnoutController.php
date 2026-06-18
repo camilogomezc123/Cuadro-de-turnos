@@ -351,14 +351,14 @@ class BurnoutController extends Controller
 
             if ($alertaCritica) {
                 BurnoutAlerta::updateOrCreate(
-                    ['resultado_id' => $resultado->id, 'tipo_alerta' => 'alerta_critica'],
+                    ['resultado_id' => $resultado->id, 'tipo_alerta' => 'burnout_severo'],
                     ['medico_id' => $medico->id, 'periodo_evaluado' => $periodo,
                      'descripcion' => "Dr. {$medico->nombre_completo}: alerta crítica en tamizaje {$periodo}.",
                      'nivel_riesgo' => 'critico', 'estado' => 'activa']
                 );
             } elseif ($tamizajePositivo) {
                 BurnoutAlerta::updateOrCreate(
-                    ['resultado_id' => $resultado->id, 'tipo_alerta' => 'tamizaje_positivo'],
+                    ['resultado_id' => $resultado->id, 'tipo_alerta' => 'burnout_positivo_exceso_horas'],
                     ['medico_id' => $medico->id, 'periodo_evaluado' => $periodo,
                      'descripcion' => "Dr. {$medico->nombre_completo}: tamizaje positivo en {$periodo}.",
                      'nivel_riesgo' => 'alto', 'estado' => 'activa']

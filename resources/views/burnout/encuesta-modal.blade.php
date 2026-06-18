@@ -127,16 +127,21 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
             },
             body: JSON.stringify({ encuesta_id: encuestaId, periodo, respuestas }),
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) return r.text().then(t => { throw new Error(t); });
+            return r.json();
+        })
         .then(data => {
             if (!data.ok) { alert(data.mensaje); return; }
             document.getElementById('burnout-form-wrap').style.display = 'none';
             const nivel = data.nivel;
-            const icono = nivel === 'severo' ? '🔴' : (nivel === 'positivo' ? '🟡' : '🟢');
-            const titulo = nivel === 'severo' ? 'Señales importantes detectadas'
+            const icono = nivel === 'critico' ? '🔴' : (nivel === 'positivo' ? '🟡' : '🟢');
+            const titulo = nivel === 'critico' ? 'Señales importantes detectadas'
                          : nivel === 'positivo' ? 'Señales de alerta detectadas'
                          : 'Evaluación completada';
             document.getElementById('burnout-resultado-icono').textContent   = icono;
@@ -144,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('burnout-resultado-mensaje').textContent = data.mensaje;
             document.getElementById('burnout-resultado').style.display = '';
         })
-        .catch(() => alert('Error al enviar. Intente nuevamente.'));
+        .catch(err => { console.error('Burnout error:', err); alert('Error al enviar. Intente nuevamente.'); });
     });
 
     // Posponer
