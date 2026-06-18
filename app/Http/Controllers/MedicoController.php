@@ -2,47 +2,102 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ArchivoCargado;
 use App\Models\Medico;
-use App\Repositories\MedicoRepository;
-use App\Repositories\UciRepository;
+use App\Models\TurnoMedico;
+use App\Models\Uci;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MedicoController extends Controller
 {
-    public function __construct(
-        private MedicoRepository $medicoRepo,
-        private UciRepository $uciRepo,
-    ) {}
+    private function mesAnio(Request $request): array
+    {
+        return [
+            (int) $request->get('mes',  now()->month),
+            (int) $request->get('anio', now()->year),
+        ];
+    }
 
     public function index(Request $request)
     {
-        $archivos  = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
-        $archivoId = $request->get('archivo_id', $archivos->first()?->id);
-        $uciId     = $request->get('uci_id');
-        $ucis      = $this->uciRepo->listar();
+        [$mes, $anio] = $this->mesAnio($request);
+        $uciId = $request->get('uci_id');
+        $ucis  = Uci::where('activa', true)->orderBy('nombre')->get();
 
-        $medicos = $this->medicoRepo->listar($uciId ?: null, $archivoId);
+        $query = Medico::where('activo', true);
+        if ($uciId) $query->where('uci_id', $uciId);
+        $medicos = $query->with('uci')->orderBy('nombre')->get();
 
-        return view('medicos.index', compact('medicos', 'ucis', 'archivos', 'archivoId', 'uciId'));
+        // Calcular horas del mes para cada médico directamente desde turno_medicos
+        $ini = Carbon::create($anio, $mes, 1)->startOfMonth()->toDateString();
+        $fin = Carbon::create($anio, $mes, 1)->endOfMonth()->toDateString();
+
+        $horasPorMedico = TurnoMedico::select('medico_id',
+                DB::raw('SUM(horas_total) as total_horas'),
+                DB::raw('SUM(horas_nocturnas) as horas_nocturnas'),
+                DB::raw('COUNT(*) as total_turnos'),
+            )
+            ->whereBetween('fecha', [$ini, $fin])
+            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->when($uciId, fn($q) => $q->where('uci_id', $uciId))
+            ->groupBy('medico_id')
+            ->get()->keyBy('medico_id');
+
+        $nombresMeses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        return view('medicos.index', compact('medicos','ucis','uciId','mes','anio','horasPorMedico','nombresMeses'));
     }
 
     public function show(Request $request, Medico $medico)
     {
-        $archivos  = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
-        $archivoId = $request->get('archivo_id', $archivos->first()?->id);
-        $archivo   = $archivos->find($archivoId);
+        [$mes, $anio] = $this->mesAnio($request);
+        $ini = Carbon::create($anio, $mes, 1)->startOfMonth()->toDateString();
+        $fin = Carbon::create($anio, $mes, 1)->endOfMonth()->toDateString();
 
-        $indicador = null;
-        $turnos    = collect();
+        // Turnos del mes seleccionado (todas las UCIs del médico)
+        $turnos = TurnoMedico::where('medico_id', $medico->id)
+            ->whereBetween('fecha', [$ini, $fin])
+            ->with('uci')
+            ->orderBy('fecha')
+            ->get();
 
-        if ($archivo) {
-            $indicador = $this->medicoRepo->getIndicadoresMedico($medico->id, $archivo->mes, $archivo->anio);
-            $turnos    = $this->medicoRepo->getTurnosMedico($medico->id, $archivo->mes, $archivo->anio);
-        }
+        // Indicador calculado del mes
+        $indicador = [
+            'total_horas'      => $turnos->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->sum('horas_total'),
+            'horas_nocturnas'  => $turnos->sum('horas_nocturnas'),
+            'total_turnos'     => $turnos->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->count(),
+            'fines_semana'     => $turnos->where('es_fin_semana', true)->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->count(),
+            'turnos_nocturnos' => $turnos->whereIn('codigo_turno',['N','MTN','MN'])->count(),
+        ];
+        $indicador['supera_200h']  = $indicador['total_horas'] > 200;
+        $indicador['horas_diurnas']= $indicador['total_horas'] - $indicador['horas_nocturnas'];
 
-        $historial = $this->medicoRepo->getHistorialMedico($medico->id);
+        // Historial: horas por mes
+        $historial = TurnoMedico::select(
+                DB::raw('YEAR(fecha) as anio'),
+                DB::raw('MONTH(fecha) as mes'),
+                DB::raw('SUM(horas_total) as total_horas'),
+                DB::raw('COUNT(*) as total_turnos'),
+                'uci_id',
+            )
+            ->where('medico_id', $medico->id)
+            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->groupBy(DB::raw('YEAR(fecha)'), DB::raw('MONTH(fecha)'), 'uci_id')
+            ->with('uci')
+            ->orderByDesc(DB::raw('YEAR(fecha)'))->orderByDesc(DB::raw('MONTH(fecha)'))
+            ->limit(24)
+            ->get();
 
-        return view('medicos.show', compact('medico', 'indicador', 'turnos', 'archivos', 'archivo', 'historial'));
+        // UCIs donde trabaja
+        $ucisDelMedico = TurnoMedico::select('uci_id', DB::raw('SUM(horas_total) as horas'))
+            ->where('medico_id', $medico->id)
+            ->whereBetween('fecha', [$ini, $fin])
+            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->groupBy('uci_id')->with('uci')->get();
+
+        $nombresMeses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        return view('medicos.show', compact('medico','turnos','indicador','historial','ucisDelMedico','mes','anio','nombresMeses'));
     }
 }

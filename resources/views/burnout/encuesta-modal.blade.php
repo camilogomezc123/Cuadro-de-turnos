@@ -10,16 +10,16 @@
                 <p class="mt-3 text-muted">Cargando evaluación...</p>
             </div>
             <div id="burnout-form-wrap" class="modal-body" style="display:none">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    Esta evaluación es anónima en su análisis agregado. Responde con sinceridad — los resultados son confidenciales y se usan para el bienestar del equipo médico. No reemplaza una valoración clínica.
+                <div class="alert alert-info border-0 small">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    <strong>Nota:</strong> Esta encuesta breve busca identificar señales tempranas de desgaste profesional asociadas a carga laboral y programación de turnos. <strong>No corresponde a un diagnóstico clínico</strong> ni reemplaza una valoración profesional. La información será usada con fines de bienestar laboral y mejora organizacional.
                 </div>
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">Escala de respuesta</h6>
+                <div class="mb-3 p-3 rounded" style="background:#f8fafc">
+                    <div class="small fw-semibold text-muted mb-2">Escala de respuesta (seleccione un valor del 0 al 6 para cada pregunta):</div>
                     <div class="d-flex flex-wrap gap-1">
                         <span class="badge bg-light text-dark border">0 – Nunca</span>
                         <span class="badge bg-light text-dark border">1 – Pocas veces al año</span>
-                        <span class="badge bg-light text-dark border">2 – Una vez al mes o menos</span>
+                        <span class="badge bg-light text-dark border">2 – Una vez al mes</span>
                         <span class="badge bg-light text-dark border">3 – Pocas veces al mes</span>
                         <span class="badge bg-light text-dark border">4 – Una vez a la semana</span>
                         <span class="badge bg-light text-dark border">5 – Pocas veces a la semana</span>
@@ -88,36 +88,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('burnout-preguntas');
         container.innerHTML = '';
 
-        // Agrupar por dimensión
-        const grupos = {};
-        data.preguntas.sort((a,b) => a.orden - b.orden).forEach(p => {
-            if (!grupos[p.dimension]) grupos[p.dimension] = [];
-            grupos[p.dimension].push(p);
+        // Mostrar preguntas en orden sin agrupación por dimensión
+        data.preguntas.sort((a, b) => a.orden - b.orden).forEach(p => {
+            const wrap = document.createElement('div');
+            wrap.className = 'mb-4 p-3 rounded border';
+            wrap.innerHTML = `
+              <label class="form-label fw-semibold mb-3">${p.orden}. ${p.texto_pregunta}</label>
+              <div class="d-flex gap-3 flex-wrap justify-content-start">
+                ${[0,1,2,3,4,5,6].map(v => `
+                  <div class="text-center">
+                    <input class="form-check-input d-block mx-auto mb-1" type="radio"
+                           name="resp_${p.id}" id="r_${p.id}_${v}" value="${v}"
+                           ${p.obligatoria ? 'required' : ''}>
+                    <label class="form-check-label small text-muted" for="r_${p.id}_${v}">${v}</label>
+                  </div>`).join('')}
+              </div>`;
+            container.appendChild(wrap);
         });
-
-        for (const [dim, pregs] of Object.entries(grupos)) {
-            const color  = dimColors[dim] || 'secondary';
-            const label  = dimLabels[dim] || dim;
-            const titulo = document.createElement('div');
-            titulo.className = `alert alert-${color} bg-${color} bg-opacity-10 border-${color} border-opacity-25 py-1 mb-2 mt-3`;
-            titulo.innerHTML = `<strong>${label}</strong>`;
-            container.appendChild(titulo);
-
-            pregs.forEach(p => {
-                const wrap = document.createElement('div');
-                wrap.className = 'mb-3';
-                wrap.innerHTML = `
-                  <label class="form-label fw-semibold">${p.orden}. ${p.texto_pregunta}</label>
-                  <div class="d-flex gap-2 flex-wrap">
-                    ${[0,1,2,3,4,5,6].map(v => `
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="resp_${p.id}" id="r_${p.id}_${v}" value="${v}" ${p.obligatoria ? 'required' : ''}>
-                        <label class="form-check-label small" for="r_${p.id}_${v}">${v}</label>
-                      </div>`).join('')}
-                  </div>`;
-                container.appendChild(wrap);
-            });
-        }
 
         document.getElementById('burnout-loading').style.display   = 'none';
         document.getElementById('burnout-form-wrap').style.display = '';

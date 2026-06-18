@@ -151,20 +151,22 @@
                     <i class="bi bi-chevron-right"></i>
                 </a>
                 @if(!$medicos->isEmpty())
-                <form method="POST" action="{{ route('calendario.descargar') }}">
-                    @csrf
-                    <input type="hidden" name="uci_id" value="{{ $uciId }}">
-                    <input type="hidden" name="mes"    value="{{ $mes }}">
-                    <input type="hidden" name="anio"   value="{{ $anio }}">
-                    <button class="btn btn-success btn-sm">
-                        <i class="bi bi-file-excel me-1"></i>Descargar Excel
-                    </button>
-                </form>
+                <button class="btn btn-success btn-sm" onclick="document.getElementById('form-descargar').submit()">
+                    <i class="bi bi-file-excel me-1"></i>Descargar Excel
+                </button>
                 @endif
             </div>
         </form>
     </div>
 </div>
+
+{{-- Formulario de descarga SEPARADO (no anidado) --}}
+<form id="form-descargar" method="POST" action="{{ route('calendario.descargar') }}" style="display:none">
+    @csrf
+    <input type="hidden" name="uci_id" value="{{ $uciId }}">
+    <input type="hidden" name="mes"    value="{{ $mes }}">
+    <input type="hidden" name="anio"   value="{{ $anio }}">
+</form>
 
 @if($medicos->isEmpty())
     <div class="panel p-5 text-center">

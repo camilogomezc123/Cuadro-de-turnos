@@ -473,21 +473,43 @@ function abrirOfrecer(id,fecha,codigo){
     new bootstrap.Modal(document.getElementById('modalOfrecer')).show();
 }
 const MES={{ $mes }}, ANIO={{ $anio }};
-document.getElementById('medicoReceptor')?.addEventListener('change',function(){
-    const id=this.value, tipo=document.getElementById('tipoMov').value;
-    const sel=document.getElementById('turnoDest');
-    if(!id||tipo==='donacion_directa'){sel.innerHTML='<option value="">No aplica para donación</option>';return;}
-    sel.innerHTML='<option>Cargando...</option>';
-    fetch(`{{ route('medico.turnos-api') }}?medico_id=${id}&mes=${MES}&anio=${ANIO}`)
-        .then(r=>r.json()).then(ts=>{
-            sel.innerHTML='<option value="">Seleccione...</option>'+
-                ts.map(t=>`<option value="${t.id}">${t.label}</option>`).join('');
+function cargarTurnosReceptor() {
+    const medicoId = document.getElementById('medicoReceptor')?.value;
+    const tipo     = document.getElementById('tipoMov')?.value;
+    const sel      = document.getElementById('turnoDest');
+    const div      = document.getElementById('divTurnoDest');
+    if (!sel || !div) return;
+
+    if (!medicoId || tipo === 'donacion_directa') {
+        sel.innerHTML = '<option value="">No aplica para donación</option>';
+        div.style.opacity = tipo === 'donacion_directa' ? '.4' : '1';
+        sel.required = false;
+        return;
+    }
+    div.style.opacity = '1';
+    sel.required = true;
+    sel.innerHTML = '<option>Cargando...</option>';
+    fetch(`{{ route('medico.turnos-api') }}?medico_id=${medicoId}&mes=${MES}&anio=${ANIO}`)
+        .then(r => r.json()).then(ts => {
+            if (ts.length === 0) {
+                sel.innerHTML = '<option value="">Sin turnos disponibles este mes</option>';
+            } else {
+                sel.innerHTML = '<option value="">Seleccione turno del receptor...</option>' +
+                    ts.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+            }
         });
-});
-document.getElementById('tipoMov')?.addEventListener('change',function(){
-    const don=this.value==='donacion_directa';
-    document.getElementById('divTurnoDest').style.opacity=don?'.4':'1';
-    if(don) document.getElementById('turnoDest').innerHTML='<option value="">No aplica</option>';
+}
+
+document.getElementById('medicoReceptor')?.addEventListener('change', cargarTurnosReceptor);
+document.getElementById('tipoMov')?.addEventListener('change', function() {
+    const don = this.value === 'donacion_directa';
+    document.getElementById('divTurnoDest').style.opacity = don ? '.4' : '1';
+    if (don) {
+        document.getElementById('turnoDest').innerHTML = '<option value="">No aplica</option>';
+        document.getElementById('turnoDest').required = false;
+    } else {
+        cargarTurnosReceptor();
+    }
 });
 </script>
 @endpush

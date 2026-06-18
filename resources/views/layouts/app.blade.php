@@ -261,6 +261,12 @@
         <a class="nav-link {{ request()->routeIs('turno-ahora.*') ? 'active' : '' }}" href="{{ route('turno-ahora.index') }}">
             <i class="bi bi-activity"></i> De Turno Ahora
         </a>
+        <a class="nav-link {{ request()->routeIs('novedades.*') ? 'active' : '' }}" href="{{ route('novedades.index') }}">
+            <i class="bi bi-clipboard2-pulse"></i> Mis Novedades
+        </a>
+        <a class="nav-link {{ request()->routeIs('cambios-turno.*') ? 'active' : '' }}" href="{{ route('cambios-turno.index') }}">
+            <i class="bi bi-arrow-left-right"></i> Mis Cambios de Turno
+        </a>
 
         @else
         {{-- ── MENÚ MAESTRO ──────────────────────────── --}}

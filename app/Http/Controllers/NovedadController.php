@@ -17,6 +17,7 @@ class NovedadController extends Controller
 
     public function index(Request $request)
     {
+        $user  = Auth::user();
         $mes   = (int)($request->mes  ?? now()->month);
         $anio  = (int)($request->anio ?? now()->year);
         $tipo  = $request->tipo;
@@ -25,14 +26,20 @@ class NovedadController extends Controller
             ->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
             ->orderByDesc('created_at');
 
+        // Operativo solo ve sus propias novedades
+        if ($user->esMedico() && $user->medico_id) {
+            $query->where('medico_id', $user->medico_id);
+        }
+
         if ($tipo) $query->where('tipo_novedad', $tipo);
 
         $novedades  = $query->paginate(25);
         $tipos      = Novedad::TIPOS;
         $meses      = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                        'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        $esMaestro  = $user->esMaster();
 
-        return view('novedades.index', compact('novedades','tipos','mes','anio','meses'));
+        return view('novedades.index', compact('novedades','tipos','mes','anio','meses','esMaestro'));
     }
 
     // Registrar no asistencia a un turno (quita horas)

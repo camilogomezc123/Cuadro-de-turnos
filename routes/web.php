@@ -61,6 +61,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/ucis',       [UciController::class, 'index'])->name('ucis.index');
     Route::get('/ucis/{uci}', [UciController::class, 'show']) ->name('ucis.show');
 
+    // ── Novedades y cambios: accesibles por operativo (ven solo las suyas) ──
+    Route::get('/novedades',       [NovedadController::class, 'index'])->name('novedades.index');
+    Route::post('/novedades',      [NovedadController::class, 'store'])->name('novedades.store');
+    Route::get('/cambios-turno',   [CambioTurnoController::class, 'index'])->name('cambios-turno.index');
+    Route::get('/cambios-turno/{cambioTurno}', [CambioTurnoController::class, 'show'])->name('cambios-turno.show');
+
     // ── Solo maestro ──────────────────────────────────────────────
     Route::middleware('master')->group(function () {
 
@@ -95,9 +101,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])   ->name('secuencias.agregar-medico');
         Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])          ->name('secuencias.destroy');
 
-        // Novedades
-        Route::get('/novedades',                          [NovedadController::class, 'index'])               ->name('novedades.index');
-        Route::post('/novedades',                         [NovedadController::class, 'store'])                ->name('novedades.store');
+        // Novedades (maestro: registrar no asistencia, actualizar, eliminar)
         Route::post('/novedades/no-asistencia/{turno}',   [NovedadController::class, 'registrarNoAsistencia'])->name('novedades.no-asistencia');
         Route::patch('/novedades/{novedad}',              [NovedadController::class, 'update'])               ->name('novedades.update');
         Route::delete('/novedades/{novedad}',             [NovedadController::class, 'destroy'])              ->name('novedades.destroy');
@@ -128,8 +132,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('/ausencias/{ausencia}/aprobar', [AusenciaController::class, 'aprobar'])->name('ausencias.aprobar');
         Route::patch('/ausencias/{ausencia}/rechazar',[AusenciaController::class, 'rechazar'])->name('ausencias.rechazar');
 
-        // Cambios de turno (vista maestro heredada)
-        Route::resource('cambios-turno', CambioTurnoController::class)->names('cambios-turno');
+        // Cambios de turno: acciones solo maestro
+        Route::post('/cambios-turno', [CambioTurnoController::class, 'store'])->name('cambios-turno.create');
         Route::patch('/cambios-turno/{cambio}/aceptar',        [CambioTurnoController::class, 'aceptar'])       ->name('cambios-turno.aceptar');
         Route::patch('/cambios-turno/{cambio}/rechazar-colega',[CambioTurnoController::class, 'rechazarColega'])->name('cambios-turno.rechazar-colega');
         Route::patch('/cambios-turno/{cambio}/aprobar',        [CambioTurnoController::class, 'aprobar'])        ->name('cambios-turno.aprobar');

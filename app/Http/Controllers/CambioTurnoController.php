@@ -16,8 +16,9 @@ class CambioTurnoController extends Controller
 
     public function index(Request $request)
     {
-        $archivos  = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
-        $archivoId = $request->integer('archivo_id', $archivos->first()?->id ?? 0);
+        $user      = auth()->user();
+        $mes       = (int)($request->mes  ?? now()->month);
+        $anio      = (int)($request->anio ?? now()->year);
         $estado    = $request->string('estado', '');
 
         $query = SolicitudCambioTurno::with([
@@ -26,19 +27,27 @@ class CambioTurnoController extends Controller
                 'medicoSolicitante', 'medicoReceptor'
             ])->orderByDesc('created_at');
 
-        if ($estado) $query->where('estado', $estado);
-        if ($archivoId) {
-            $query->whereHas('turnoOrigen', fn($q) => $q->where('archivo_id', $archivoId));
+        // Operativo: solo ve sus propias solicitudes
+        if ($user->esMedico() && $user->medico_id) {
+            $query->where(function($q) use ($user) {
+                $q->where('medico_solicitante_id', $user->medico_id)
+                  ->orWhere('medico_receptor_id',  $user->medico_id);
+            });
         }
+
+        if ($estado) $query->where('estado', $estado);
+
+        $query->whereHas('turnoOrigen', fn($q) =>
+            $q->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
+        );
 
         $solicitudes = $query->paginate(25)->withQueryString();
         $medicos     = Medico::where('activo', true)->orderBy('nombre')->get();
-        $turnos      = $archivoId
-            ? TurnoMedico::where('archivo_id', $archivoId)->with('medico')->orderBy('fecha')->get()
-            : collect();
+        $esMaestro   = $user->esMaster();
+        $nombresMeses= ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
         return view('cambios-turno.index', compact(
-            'solicitudes', 'archivos', 'archivoId', 'estado', 'medicos', 'turnos'
+            'solicitudes','estado','medicos','esMaestro','mes','anio','nombresMeses'
         ));
     }
 

@@ -10,78 +10,54 @@ class BurnoutSeeder extends Seeder
 {
     public function run(): void
     {
+        // Eliminar encuesta previa si existe (para re-sembrar limpio)
+        BurnoutEncuesta::query()->delete();
+
         $enc = BurnoutEncuesta::create([
-            'nombre'           => 'Evaluación de Bienestar Profesional',
-            'descripcion'      => 'Encuesta periódica de evaluación de desgaste profesional para el equipo médico.',
+            'nombre'           => 'Tamizaje de Desgaste Profesional',
+            'descripcion'      => 'Encuesta breve de 5 preguntas orientada a detectar riesgo de desgaste profesional. No es diagnóstica ni reemplaza valoración clínica.',
             'periodo'          => 'mensual',
             'activa'           => true,
             'permite_posponer' => false,
             'creada_por'       => 1,
         ]);
 
-        // ── Agotamiento Emocional (9 ítems) ──────────────────────
-        $ae = [
-            'Ítem AE-1: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-2: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-3: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-4: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-5: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-6: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-7: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-8: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
-            'Ítem AE-9: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Agotamiento emocional',
+        $preguntas = [
+            [
+                'texto_pregunta' => 'Me siento emocionalmente agotado por mi trabajo.',
+                'dimension'      => 'agotamiento_emocional',
+                'orden'          => 1,
+            ],
+            [
+                'texto_pregunta' => 'Siento que mi carga laboral supera mi capacidad de recuperación.',
+                'dimension'      => 'carga_laboral_recuperacion',
+                'orden'          => 2,
+            ],
+            [
+                'texto_pregunta' => 'Me he sentido más distante, frío o irritable con pacientes o compañeros.',
+                'dimension'      => 'despersonalizacion',
+                'orden'          => 3,
+            ],
+            [
+                'texto_pregunta' => 'Siento que mi trabajo ha perdido satisfacción o sentido de logro.',
+                'dimension'      => 'realizacion_personal',
+                'orden'          => 4,
+            ],
+            [
+                'texto_pregunta' => 'Mis turnos están afectando mi descanso, vida familiar o bienestar.',
+                'dimension'      => 'impacto_turnos',
+                'orden'          => 5,
+            ],
         ];
 
-        // ── Despersonalización (5 ítems) ─────────────────────────
-        $dp = [
-            'Ítem D-1: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Despersonalización',
-            'Ítem D-2: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Despersonalización',
-            'Ítem D-3: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Despersonalización',
-            'Ítem D-4: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Despersonalización',
-            'Ítem D-5: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Despersonalización',
-        ];
-
-        // ── Realización Personal (8 ítems) ──────────────────────
-        $rp = [
-            'Ítem RP-1: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-2: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-3: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-4: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-5: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-6: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-7: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-            'Ítem RP-8: [Reemplazar con texto autorizado institucionalmente] — Dimensión: Realización personal',
-        ];
-
-        $orden = 1;
-        foreach ($ae as $txt) {
+        foreach ($preguntas as $p) {
             BurnoutPregunta::create([
-                'encuesta_id'   => $enc->id,
-                'texto_pregunta'=> $txt,
-                'dimension'     => 'agotamiento_emocional',
-                'orden'         => $orden++,
-                'activa'        => true,
-                'obligatoria'   => true,
-            ]);
-        }
-        foreach ($dp as $txt) {
-            BurnoutPregunta::create([
-                'encuesta_id'   => $enc->id,
-                'texto_pregunta'=> $txt,
-                'dimension'     => 'despersonalizacion',
-                'orden'         => $orden++,
-                'activa'        => true,
-                'obligatoria'   => true,
-            ]);
-        }
-        foreach ($rp as $txt) {
-            BurnoutPregunta::create([
-                'encuesta_id'   => $enc->id,
-                'texto_pregunta'=> $txt,
-                'dimension'     => 'realizacion_personal',
-                'orden'         => $orden++,
-                'activa'        => true,
-                'obligatoria'   => true,
+                'encuesta_id'    => $enc->id,
+                'texto_pregunta' => $p['texto_pregunta'],
+                'dimension'      => $p['dimension'],
+                'orden'          => $p['orden'],
+                'activa'         => true,
+                'obligatoria'    => true,
             ]);
         }
     }
