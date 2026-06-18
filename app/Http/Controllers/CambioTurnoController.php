@@ -16,15 +16,29 @@ class CambioTurnoController extends Controller
 
     public function index(Request $request)
     {
-        $user      = auth()->user();
-        $mes       = (int)($request->mes  ?? now()->month);
-        $anio      = (int)($request->anio ?? now()->year);
-        $estado    = $request->string('estado', '');
+        $user    = auth()->user();
+        $estado  = $request->string('estado', '');
+
+        // Períodos disponibles
+        $archivos  = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get();
+        $archivoId = (int)($request->archivo_id ?? $archivos->first()?->id ?? 0);
+        $archivo   = $archivos->firstWhere('id', $archivoId);
+
+        // Turnos del médico en el período seleccionado (para el formulario de solicitud)
+        $turnos = collect();
+        if ($user->medico_id && $archivo) {
+            $turnos = TurnoMedico::where('medico_id', $user->medico_id)
+                ->where('archivo_id', $archivoId)
+                ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+                ->orderBy('fecha')
+                ->with('medico')
+                ->get();
+        }
 
         $query = SolicitudCambioTurno::with([
                 'turnoOrigen.medico', 'turnoOrigen.uci',
                 'turnoDestino.medico',
-                'medicoSolicitante', 'medicoReceptor'
+                'medicoSolicitante', 'medicoReceptor',
             ])->orderByDesc('created_at');
 
         // Operativo: solo ve sus propias solicitudes
@@ -37,17 +51,19 @@ class CambioTurnoController extends Controller
 
         if ($estado) $query->where('estado', $estado);
 
-        $query->whereHas('turnoOrigen', fn($q) =>
-            $q->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
-        );
+        if ($archivo) {
+            $query->whereHas('turnoOrigen', fn($q) =>
+                $q->whereYear('fecha', $archivo->anio)->whereMonth('fecha', $archivo->mes)
+            );
+        }
 
         $solicitudes = $query->paginate(25)->withQueryString();
         $medicos     = Medico::where('activo', true)->orderBy('nombre')->get();
         $esMaestro   = $user->esMaster();
-        $nombresMeses= ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
         return view('cambios-turno.index', compact(
-            'solicitudes','estado','medicos','esMaestro','mes','anio','nombresMeses'
+            'solicitudes','estado','medicos','esMaestro',
+            'archivos','archivoId','turnos'
         ));
     }
 
