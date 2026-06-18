@@ -114,8 +114,8 @@
 {{-- ── SELECTOR ──────────────────────────────────────── --}}
 <div class="panel mb-4">
     <div class="panel-body">
-        <form method="GET" action="{{ route('calendario.index') }}" class="row g-2 align-items-end">
-            <div class="col-sm-3">
+        <form method="GET" action="{{ route('calendario.index') }}" class="row g-2 align-items-end" id="form-calendario">
+            <div class="col-sm-4">
                 <label class="form-label small fw-semibold mb-1">UCI</label>
                 <select name="uci_id" class="form-select form-select-sm" onchange="this.form.submit()">
                     @foreach($ucis as $u)
@@ -124,44 +124,49 @@
                 </select>
             </div>
             <div class="col-sm-3">
-                <label class="form-label small fw-semibold mb-1">Período</label>
-                <select name="archivo_id" class="form-select form-select-sm" onchange="this.form.submit()">
-                    @foreach($archivos as $a)
-                        <option value="{{ $a->id }}" {{ $a->id == $archivoId ? 'selected':'' }}>
-                            {{ $a->nombre_mes }} {{ $a->anio }}
-                        </option>
+                <label class="form-label small fw-semibold mb-1">Mes</label>
+                <select name="mes" class="form-select form-select-sm" onchange="this.form.submit()">
+                    @foreach($nombresMeses as $n => $label)
+                        @if($n > 0)
+                        <option value="{{ $n }}" {{ $n == $mes ? 'selected':'' }}>{{ $label }}</option>
+                        @endif
                     @endforeach
                 </select>
             </div>
-            @if($archivo)
-            <div class="col-auto ms-auto d-flex gap-2">
-                @if($mesAnteriorArchivo)
-                <a href="{{ route('calendario.index', ['archivo_id'=>$mesAnteriorArchivo->id,'uci_id'=>$uciId]) }}"
+            <div class="col-sm-2">
+                <label class="form-label small fw-semibold mb-1">Año</label>
+                <select name="anio" class="form-select form-select-sm" onchange="this.form.submit()">
+                    @foreach($anios as $y)
+                        <option value="{{ $y }}" {{ $y == $anio ? 'selected':'' }}>{{ $y }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-auto ms-auto d-flex gap-2 align-items-end">
+                <a href="{{ route('calendario.index', ['uci_id'=>$uciId,'mes'=>$prevMes,'anio'=>$prevAnio]) }}"
                    class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-chevron-left"></i>
                 </a>
-                @endif
-                @if($mesSiguienteArchivo)
-                <a href="{{ route('calendario.index', ['archivo_id'=>$mesSiguienteArchivo->id,'uci_id'=>$uciId]) }}"
+                <a href="{{ route('calendario.index', ['uci_id'=>$uciId,'mes'=>$nextMes,'anio'=>$nextAnio]) }}"
                    class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-chevron-right"></i>
                 </a>
-                @endif
-                <form method="POST" action="{{ route('calendario.descargar') }}" class="d-inline">
+                @if(!$medicos->isEmpty())
+                <form method="POST" action="{{ route('calendario.descargar') }}">
                     @csrf
-                    <input type="hidden" name="archivo_id" value="{{ $archivoId }}">
                     <input type="hidden" name="uci_id" value="{{ $uciId }}">
+                    <input type="hidden" name="mes"    value="{{ $mes }}">
+                    <input type="hidden" name="anio"   value="{{ $anio }}">
                     <button class="btn btn-success btn-sm">
                         <i class="bi bi-file-excel me-1"></i>Descargar Excel
                     </button>
                 </form>
+                @endif
             </div>
-            @endif
         </form>
     </div>
 </div>
 
-@if(!$archivo || $medicos->isEmpty())
+@if($medicos->isEmpty())
     <div class="panel p-5 text-center">
         <i class="bi bi-calendar3 text-primary" style="font-size:3.5rem;opacity:.3"></i>
         <h5 class="mt-3 text-secondary">Sin datos</h5>
@@ -171,16 +176,14 @@
 
 {{-- ── CABECERA DEL MES ──────────────────────────────── --}}
 @php
-    $nombresMeses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     $diasSemana   = ['L','M','M','J','V','S','D'];
     $hoy          = now()->day;
-    $esEsteMes    = (now()->month == $archivo->mes && now()->year == $archivo->anio);
+    $esEsteMes    = (now()->month == $mes && now()->year == $anio);
 
     // Para cada día: dow info
     $infosDias = [];
     for ($d = 1; $d <= $diasDelMes; $d++) {
-        $f   = \Carbon\Carbon::create($archivo->anio, $archivo->mes, $d);
+        $f   = \Carbon\Carbon::create($anio, $mes, $d);
         $dow = ($f->dayOfWeek === 0) ? 6 : $f->dayOfWeek - 1;
         $infosDias[$d] = [
             'dow'    => $dow,
@@ -208,7 +211,7 @@
     <div class="panel-header d-flex justify-content-between align-items-center">
         <span class="panel-title">
             <i class="bi bi-calendar-month me-2 text-primary"></i>
-            {{ $uci->nombre ?? '' }} &mdash; {{ $nombresMeses[$archivo->mes] }} {{ $archivo->anio }}
+            {{ $uci->nombre ?? '' }} &mdash; {{ $nombresMeses[$mes] }} {{ $anio }}
         </span>
         <span class="text-muted small">{{ $medicos->count() }} médicos · {{ $diasDelMes }} días</span>
     </div>

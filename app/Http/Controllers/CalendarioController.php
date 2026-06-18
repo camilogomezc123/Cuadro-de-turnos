@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ArchivoCargado;
 use App\Models\Uci;
 use App\Models\TurnoMedico;
 use App\Models\Medico;
@@ -13,41 +12,45 @@ class CalendarioController extends Controller
 {
     public function index(Request $request)
     {
-        $ucis     = Uci::orderBy('nombre')->get();
-        $archivos = ArchivoCargado::where('procesado', true)
-                        ->orderByDesc('anio')->orderByDesc('mes')->get();
+        $ucis  = Uci::orderBy('nombre')->get();
+        $uciId = $request->get('uci_id', $ucis->first()?->id);
+        $uci   = $ucis->find($uciId);
 
-        $uciId     = $request->get('uci_id', $ucis->first()?->id);
-        $archivoId = $request->get('archivo_id', $archivos->first()?->id);
-        $uci       = $ucis->find($uciId);
-        $archivo   = $archivos->find($archivoId);
+        $mes  = (int) $request->get('mes',  now()->month);
+        $anio = (int) $request->get('anio', now()->year);
 
-        $grilla        = [];
-        $medicos       = collect();
-        $diasDelMes    = 0;
-        $primerDiaDow  = 0;
+        // Clamp to valid ranges
+        $mes  = max(1, min(12, $mes));
+        $anio = max(2020, min(2035, $anio));
 
-        if ($archivo && $uciId) {
-            $diasDelMes   = cal_days_in_month(CAL_GREGORIAN, $archivo->mes, $archivo->anio);
-            $primerDia    = Carbon::create($archivo->anio, $archivo->mes, 1);
-            $primerDiaDow = ($primerDia->dayOfWeek === 0) ? 6 : $primerDia->dayOfWeek - 1; // 0=Lun
+        $anios        = range(now()->year - 2, now()->year + 2);
+        $nombresMeses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                         'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-            // Obtener todos los turnos del mes/UCI
-            $turnos = TurnoMedico::where('archivo_id', $archivoId)
-                ->where('uci_id', $uciId)
+        $grilla       = [];
+        $medicos      = collect();
+        $diasDelMes   = 0;
+        $primerDiaDow = 0;
+
+        if ($uciId) {
+            $diasDelMes   = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
+            $primerDia    = Carbon::create($anio, $mes, 1);
+            $primerDiaDow = ($primerDia->dayOfWeek === 0) ? 6 : $primerDia->dayOfWeek - 1;
+
+            $fechaInicio = Carbon::create($anio, $mes, 1)->startOfMonth()->toDateString();
+            $fechaFin    = Carbon::create($anio, $mes, 1)->endOfMonth()->toDateString();
+
+            $turnos = TurnoMedico::where('uci_id', $uciId)
+                ->whereBetween('fecha', [$fechaInicio, $fechaFin])
                 ->with('medico')
                 ->orderBy('fecha')
                 ->get();
 
-            // Agrupar: medicoId → dia → turno
             $medicoIds = $turnos->pluck('medico_id')->unique();
             $medicos   = Medico::whereIn('id', $medicoIds)->orderBy('nombre')->get();
 
             foreach ($medicos as $medico) {
-                $grilla[$medico->id] = [];
-                for ($d = 1; $d <= $diasDelMes; $d++) {
-                    $grilla[$medico->id][$d] = '';
-                }
+                $grilla[$medico->id] = array_fill(1, $diasDelMes, '');
             }
             foreach ($turnos as $t) {
                 $dia = (int) Carbon::parse($t->fecha)->format('d');
@@ -58,37 +61,32 @@ class CalendarioController extends Controller
         }
 
         // Navegación mes anterior / siguiente
-        $mesAnteriorArchivo = null;
-        $mesSiguienteArchivo = null;
-        if ($archivo) {
-            $current = $archivo->anio * 12 + $archivo->mes;
-            $mesAnteriorArchivo = $archivos
-                ->filter(fn($a) => ($a->anio * 12 + $a->mes) < $current)
-                ->sortByDesc(fn($a) => $a->anio * 12 + $a->mes)
-                ->first();
-            $mesSiguienteArchivo = $archivos
-                ->filter(fn($a) => ($a->anio * 12 + $a->mes) > $current)
-                ->sortBy(fn($a) => $a->anio * 12 + $a->mes)
-                ->first();
-        }
+        $prevMes  = $mes === 1  ? 12 : $mes - 1;
+        $prevAnio = $mes === 1  ? $anio - 1 : $anio;
+        $nextMes  = $mes === 12 ? 1  : $mes + 1;
+        $nextAnio = $mes === 12 ? $anio + 1 : $anio;
 
         return view('calendario.index', compact(
-            'ucis', 'archivos', 'uci', 'uciId', 'archivo', 'archivoId',
+            'ucis', 'uci', 'uciId',
+            'mes', 'anio', 'anios', 'nombresMeses',
             'grilla', 'medicos', 'diasDelMes', 'primerDiaDow',
-            'mesAnteriorArchivo', 'mesSiguienteArchivo'
+            'prevMes', 'prevAnio', 'nextMes', 'nextAnio'
         ));
     }
 
     public function descargarExcel(Request $request)
     {
-        $archivoId = $request->archivo_id;
-        $uciId     = $request->uci_id;
-        $archivo   = ArchivoCargado::findOrFail($archivoId);
-        $uci       = Uci::findOrFail($uciId);
+        $uciId = $request->uci_id;
+        $mes   = (int) $request->get('mes',  now()->month);
+        $anio  = (int) $request->get('anio', now()->year);
+        $uci   = Uci::findOrFail($uciId);
 
-        $diasDelMes = cal_days_in_month(CAL_GREGORIAN, $archivo->mes, $archivo->anio);
-        $turnos     = TurnoMedico::where('archivo_id', $archivoId)
-            ->where('uci_id', $uciId)
+        $diasDelMes  = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
+        $fechaInicio = Carbon::create($anio, $mes, 1)->startOfMonth()->toDateString();
+        $fechaFin    = Carbon::create($anio, $mes, 1)->endOfMonth()->toDateString();
+
+        $turnos = TurnoMedico::where('uci_id', $uciId)
+            ->whereBetween('fecha', [$fechaInicio, $fechaFin])
             ->with('medico')
             ->orderBy('fecha')
             ->get();
@@ -116,7 +114,7 @@ class CalendarioController extends Controller
                          'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
         // Fila 1: Título UCI
-        $sheet->setCellValue([1, 1], $uci->nombre . ' — ' . $nombresMeses[$archivo->mes] . ' ' . $archivo->anio);
+        $sheet->setCellValue([1, 1], $uci->nombre . ' — ' . $nombresMeses[$mes] . ' ' . $anio);
         $sheet->mergeCells([1,1, $diasDelMes+1, 1]);
         $sheet->getStyle([1,1,$diasDelMes+1,1])->applyFromArray([
             'font' => ['bold' => true, 'size' => 13],
@@ -126,7 +124,7 @@ class CalendarioController extends Controller
         // Fila 2: Iniciales días semana
         $diasSemana = ['L','M','M','J','V','S','D'];
         for ($d = 1; $d <= $diasDelMes; $d++) {
-            $fecha = Carbon::create($archivo->anio, $archivo->mes, $d);
+            $fecha = Carbon::create($anio, $mes, $d);
             $dow   = ($fecha->dayOfWeek === 0) ? 6 : $fecha->dayOfWeek - 1;
             $sheet->setCellValue([$d+1, 2], $diasSemana[$dow]);
         }
@@ -152,7 +150,7 @@ class CalendarioController extends Controller
         }
 
         $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $filename = "Cuadro_Turnos_{$uci->codigo}_{$nombresMeses[$archivo->mes]}_{$archivo->anio}.xlsx";
+        $filename = "Cuadro_Turnos_{$uci->codigo}_{$nombresMeses[$mes]}_{$anio}.xlsx";
 
         return response()->streamDownload(function() use ($writer) {
             $writer->save('php://output');
