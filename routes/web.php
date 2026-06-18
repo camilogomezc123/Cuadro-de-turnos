@@ -95,6 +95,7 @@ Route::middleware('auth')->group(function () {
 
         // Consolidado / Excel
         Route::get('/consolidado',              [ConsolidadoController::class, 'index'])              ->name('consolidado.index');
+        Route::get('/consolidado/anual',        [ConsolidadoController::class, 'anual'])              ->name('consolidado.anual');
         Route::get('/consolidado/excel',        [ConsolidadoController::class, 'descargarConsolidado'])->name('consolidado.excel');
         Route::get('/consolidado/cuadro-excel', [ConsolidadoController::class, 'descargarCuadro'])    ->name('consolidado.cuadro-excel');
 

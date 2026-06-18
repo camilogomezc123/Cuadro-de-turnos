@@ -45,6 +45,67 @@ class ConsolidadoController extends Controller
         ));
     }
 
+    // ── Consolidado anual: todos los médicos × 12 meses ─────────
+
+    public function anual(Request $request)
+    {
+        $anio  = (int)($request->anio ?? now()->year);
+        $anios = range(now()->year - 2, now()->year + 2);
+        $meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        // Una sola consulta: horas reconocidas por médico × mes
+        $filas = \Illuminate\Support\Facades\DB::table('turno_medicos')
+            ->join('medicos','medicos.id','=','turno_medicos.medico_id')
+            ->where('medicos.activo', true)
+            ->whereYear('turno_medicos.fecha', $anio)
+            ->where('turno_medicos.fue_laborado', true)
+            ->selectRaw('
+                medicos.id,
+                medicos.nombre,
+                medicos.apellido,
+                MONTH(turno_medicos.fecha) as mes,
+                SUM(COALESCE(turno_medicos.horas_reconocidas, turno_medicos.horas_total)) as horas
+            ')
+            ->groupBy('medicos.id','medicos.nombre','medicos.apellido',
+                      \Illuminate\Support\Facades\DB::raw('MONTH(turno_medicos.fecha)'))
+            ->orderBy('medicos.nombre')
+            ->get();
+
+        // Pivotar: [medico_id => [nombre, meses[1..12]]]
+        $matriz  = [];
+        $totales = array_fill(1, 12, 0);   // total de horas por mes
+
+        foreach ($filas as $f) {
+            if (!isset($matriz[$f->id])) {
+                $matriz[$f->id] = [
+                    'nombre' => trim($f->nombre . ' ' . $f->apellido),
+                    'meses'  => array_fill(1, 12, 0),
+                    'total'  => 0,
+                ];
+            }
+            $matriz[$f->id]['meses'][$f->mes]  = (float)$f->horas;
+            $matriz[$f->id]['total']           += (float)$f->horas;
+            $totales[$f->mes]                  += (float)$f->horas;
+        }
+
+        // Médicos activos que no tienen ningún turno en el año (mostrarlos en 0)
+        $medicosActivos = \App\Models\Medico::where('activo', true)->orderBy('nombre')->get();
+        foreach ($medicosActivos as $m) {
+            if (!isset($matriz[$m->id])) {
+                $matriz[$m->id] = [
+                    'nombre' => $m->nombre_completo,
+                    'meses'  => array_fill(1, 12, 0),
+                    'total'  => 0,
+                ];
+            }
+        }
+
+        uasort($matriz, fn($a, $b) => $b['total'] <=> $a['total']); // ordenar por total desc
+
+        return view('consolidado.anual', compact('anio','anios','meses','matriz','totales'));
+    }
+
     // ── Excel: Consolidado mensual por médico ────────────────────
 
     public function descargarConsolidado(Request $request)

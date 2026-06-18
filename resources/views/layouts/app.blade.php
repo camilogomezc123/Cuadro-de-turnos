@@ -325,8 +325,11 @@
                 <span class="nav-badge">{{ $alertasAbiertas }}</span>
             @endif
         </a>
-        <a class="nav-link {{ request()->routeIs('consolidado.*') ? 'active' : '' }}" href="{{ route('consolidado.index') }}">
-            <i class="bi bi-bar-chart-line"></i> Consolidado / Excel
+        <a class="nav-link {{ request()->routeIs('consolidado.index') || request()->routeIs('consolidado.excel') || request()->routeIs('consolidado.cuadro-excel') ? 'active' : '' }}" href="{{ route('consolidado.index') }}">
+            <i class="bi bi-bar-chart-line"></i> Consolidado mensual
+        </a>
+        <a class="nav-link {{ request()->routeIs('consolidado.anual') ? 'active' : '' }}" href="{{ route('consolidado.anual') }}">
+            <i class="bi bi-calendar-range"></i> Consolidado anual
         </a>
         <a class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}" href="{{ route('reportes.index') }}">
             <i class="bi bi-file-earmark-bar-graph"></i> Reportes

@@ -52,11 +52,22 @@ class AuthController extends Controller
     public function usuarios()
     {
         $usuarios = User::with('medico')->orderBy('rol')->orderBy('name')->get();
-        // Médicos sin usuario asignado todavía
-        $medicosSinUsuario = Medico::whereNotIn('id', User::whereNotNull('medico_id')->pluck('medico_id'))
-            ->orderBy('nombre')->get();
 
-        return view('auth.usuarios', compact('usuarios', 'medicosSinUsuario'));
+        $medicoIdsConUsuario = User::whereNotNull('medico_id')->pluck('medico_id');
+
+        $medicosSinUsuario = Medico::where('activo', true)
+            ->whereNotIn('id', $medicoIdsConUsuario)
+            ->with('uci')
+            ->orderBy('nombre')
+            ->get();
+
+        $medicosConUsuario = Medico::where('activo', true)
+            ->whereIn('id', $medicoIdsConUsuario)
+            ->with(['uci', 'user'])
+            ->orderBy('nombre')
+            ->get();
+
+        return view('auth.usuarios', compact('usuarios', 'medicosSinUsuario', 'medicosConUsuario'));
     }
 
     public function crearUsuario(Request $request)
