@@ -289,25 +289,29 @@ class TurnoEditorController extends Controller
     public function agregarMedico(Request $request)
     {
         $request->validate([
-            'uci_id'     => 'required|exists:ucis,id',
-            'mes'        => 'required|integer|between:1,12',
-            'anio'       => 'required|integer',
-            'medico_id'  => 'nullable|exists:medicos,id',
-            'nombre_nuevo'=> 'nullable|string|max:100',
-            'patron'     => 'required|array',
+            'uci_id'              => 'required|exists:ucis,id',
+            'mes'                 => 'required|integer|between:1,12',
+            'anio'                => 'required|integer',
+            'medico_id'           => 'nullable|exists:medicos,id',
+            'nombre_nuevo'        => 'nullable|string|max:100',
+            'apellido_nuevo'      => 'nullable|string|max:100',
+            'patron'              => 'required|array',
+            'reemplaza_medico_id' => 'nullable|exists:medicos,id',
         ]);
 
-        $uci = Uci::findOrFail($request->uci_id);
-        $mes = (int)$request->mes;
-        $anio= (int)$request->anio;
+        $uci  = Uci::findOrFail($request->uci_id);
+        $mes  = (int)$request->mes;
+        $anio = (int)$request->anio;
 
         // Crear médico si es nuevo
         $medicoId = $request->medico_id;
         if (!$medicoId && $request->nombre_nuevo) {
-            $medico   = Medico::firstOrCreate(
-                ['nombre' => trim($request->nombre_nuevo)],
-                ['uci_id' => $uci->id, 'activo' => true]
-            );
+            $medico   = Medico::create([
+                'nombre'   => trim($request->nombre_nuevo),
+                'apellido' => trim($request->apellido_nuevo ?? ''),
+                'uci_id'   => $uci->id,
+                'activo'   => true,
+            ]);
             $medicoId = $medico->id;
         }
 
@@ -315,15 +319,25 @@ class TurnoEditorController extends Controller
             return back()->with('error', 'Seleccione un médico o ingrese el nombre de uno nuevo.');
         }
 
-        $archivo = ArchivoCargado::where('mes', $mes)->where('anio', $anio)->first();
-        if (!$archivo) {
-            return back()->with('error', 'No existe archivo para ese mes/año. Créelo primero.');
-        }
+        $archivo = ArchivoCargado::firstOrCreate(
+            ['mes' => $mes, 'anio' => $anio],
+            ['nombre_archivo' => "Editor {$uci->codigo} {$mes}/{$anio}", 'ruta' => '', 'procesado' => false]
+        );
 
-        $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
-        $patron    = $request->patron; // [0..6] = codigo
+        $diasEnMes          = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
+        $patron             = $request->patron;
+        $reemplazaMedicoId  = $request->reemplaza_medico_id;
 
-        DB::transaction(function () use ($archivo, $medicoId, $uci, $mes, $anio, $diasEnMes, $patron) {
+        DB::transaction(function () use ($archivo, $medicoId, $uci, $mes, $anio, $diasEnMes, $patron, $reemplazaMedicoId) {
+            // Borrar turnos del médico que se reemplaza
+            if ($reemplazaMedicoId) {
+                TurnoMedico::where('archivo_id', $archivo->id)
+                    ->where('medico_id', $reemplazaMedicoId)
+                    ->where('uci_id', $uci->id)
+                    ->delete();
+            }
+
+            // Borrar turnos previos del nuevo médico (por si ya existía)
             TurnoMedico::where('archivo_id', $archivo->id)
                 ->where('medico_id', $medicoId)
                 ->where('uci_id', $uci->id)->delete();
@@ -337,18 +351,19 @@ class TurnoEditorController extends Controller
                 $horas  = self::HORAS_MAP[$codigo] ?? 0;
 
                 $filas[] = [
-                    'archivo_id'   => $archivo->id,
-                    'medico_id'    => $medicoId,
-                    'uci_id'       => $uci->id,
-                    'fecha'        => $fecha->toDateString(),
-                    'dia_numero'   => $d,
-                    'dia_semana'   => $this->nombreDiaSemana($idx),
-                    'codigo_turno' => $codigo,
+                    'archivo_id'     => $archivo->id,
+                    'medico_id'      => $medicoId,
+                    'uci_id'         => $uci->id,
+                    'fecha'          => $fecha->toDateString(),
+                    'dia_numero'     => $d,
+                    'dia_semana'     => $this->nombreDiaSemana($idx),
+                    'codigo_turno'   => $codigo,
                     'horas_diurnas'  => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
                     'horas_nocturnas'=> in_array($codigo,['N','MTN','MN'])     ? 12:0,
                     'horas_total'    => $horas,
                     'es_fin_semana'  => in_array($dow,[0,6]),
                     'es_domingo'     => ($dow===0),
+                    'fue_laborado'   => true,
                     'created_at'     => now(),
                     'updated_at'     => now(),
                 ];
@@ -357,7 +372,33 @@ class TurnoEditorController extends Controller
             $this->recalcularArchivo($archivo, $mes, $anio);
         });
 
-        return back()->with('success', 'Médico agregado a la secuencia.');
+        $msg = 'Médico agregado a la secuencia.';
+        if ($reemplazaMedicoId) {
+            $reemplazado = Medico::find($reemplazaMedicoId);
+            $msg = "Médico agregado. Los turnos de {$reemplazado?->nombre_completo} fueron eliminados.";
+        }
+
+        return back()->with('success', $msg);
+    }
+
+    // ── Actualizar datos del médico ──────────────────────────────
+
+    public function actualizarMedico(Request $request, Medico $medico)
+    {
+        $request->validate([
+            'nombre'   => 'required|string|max:100',
+            'apellido' => 'nullable|string|max:100',
+        ]);
+
+        $medico->update([
+            'nombre'   => trim($request->nombre),
+            'apellido' => trim($request->apellido ?? ''),
+        ]);
+
+        return response()->json([
+            'ok'             => true,
+            'nombre_completo'=> $medico->fresh()->nombre_completo,
+        ]);
     }
 
     // ── Sustitución de turno (médico A → médico B en fecha X) ───

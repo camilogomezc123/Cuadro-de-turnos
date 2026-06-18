@@ -154,7 +154,14 @@
                     }
                 @endphp
                 <tr>
-                    <td class="col-medico fw-semibold">{{ $m->nombre_completo }}</td>
+                    <td class="col-medico fw-semibold" id="nombre-med-{{ $m->id }}">
+                        {{ $m->nombre_completo }}
+                        <button type="button" class="btn btn-link p-0 ms-1 border-0 align-middle"
+                                onclick="abrirEditMedico({{ $m->id }},'{{ addslashes($m->nombre) }}','{{ addslashes($m->apellido ?? '') }}')"
+                                title="Editar nombre">
+                            <i class="bi bi-pencil-fill text-muted" style="font-size:.65rem"></i>
+                        </button>
+                    </td>
                     @foreach($diasInfo as $d => $info)
                     @php $cod = $turnosMed[$d] ?? ''; @endphp
                     <td class="{{ $info['es_finde'] ? 'dia-finde' : '' }} {{ $info['es_hoy'] ? 'dia-hoy' : '' }} cel-edit"
@@ -269,9 +276,9 @@
 
 {{-- Modal: Agregar médico al mes --}}
 <div class="modal fade" id="modalAgregarMedico" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-dialog modal-lg"><div class="modal-content">
         <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Agregar médico al mes</h5>
+            <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Agregar médico — {{ $meses[$mes-1] }} {{ $anio }}</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <form method="POST" action="{{ route('turno-editor.agregar-medico') }}">
@@ -280,40 +287,112 @@
             <input type="hidden" name="mes"    value="{{ $mes }}">
             <input type="hidden" name="anio"   value="{{ $anio }}">
             <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Médico existente</label>
-                    <select name="medico_id" class="form-select">
-                        <option value="">— Crear nuevo —</option>
-                        @foreach($todosMedicos as $m)
-                            <option value="{{ $m->id }}">{{ $m->nombre_completo }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col">
-                        <input type="text" name="nombre_nuevo" class="form-control" placeholder="Nombre (si es nuevo)">
+
+                {{-- Nuevo médico --}}
+                <div class="card mb-3 border-primary">
+                    <div class="card-header bg-primary-subtle fw-bold small">
+                        <i class="bi bi-person-plus me-1"></i>Médico nuevo (entrante)
+                    </div>
+                    <div class="card-body pb-2">
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1">Médico existente en el sistema</label>
+                            <select name="medico_id" class="form-select form-select-sm">
+                                <option value="">— Crear médico nuevo —</option>
+                                @foreach($todosMedicos as $tm)
+                                    <option value="{{ $tm->id }}">{{ $tm->nombre_completo }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-1" id="camposNuevoMedico">
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Nombre <span class="text-muted">(si es nuevo)</span></label>
+                                <input type="text" name="nombre_nuevo"   class="form-control form-control-sm" placeholder="Nombre">
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-semibold mb-1">Apellido</label>
+                                <input type="text" name="apellido_nuevo" class="form-control form-control-sm" placeholder="Apellido">
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <label class="form-label fw-bold">Patrón semanal</label>
-                <div class="row g-1">
-                    @foreach(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as $di=>$dl)
-                    <div class="col">
-                        <label class="form-label small text-center d-block fw-bold">{{ $dl }}</label>
-                        <select name="patron[{{ $di }}]" class="form-select form-select-sm text-center">
-                            <option value="">—</option>
-                            @foreach(['M','T','MT','N','MTN','MN','PER','INC'] as $c)
-                                <option value="{{ $c }}">{{ $c }}</option>
+
+                {{-- Reemplaza a --}}
+                @if($medicosExistentes->isNotEmpty())
+                <div class="card mb-3 border-warning">
+                    <div class="card-header bg-warning-subtle fw-bold small">
+                        <i class="bi bi-arrow-left-right me-1"></i>Reemplaza a (médico saliente)
+                    </div>
+                    <div class="card-body pb-2">
+                        <label class="form-label small fw-semibold mb-1">Seleccione el médico al que reemplaza</label>
+                        <select name="reemplaza_medico_id" class="form-select form-select-sm">
+                            <option value="">— Nadie (solo agregar) —</option>
+                            @foreach($medicosExistentes as $me)
+                                <option value="{{ $me->id }}">{{ $me->nombre_completo }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text text-warning-emphasis">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Si selecciona un médico, sus turnos de este mes serán eliminados y reemplazados por los del nuevo médico.
+                        </div>
                     </div>
-                    @endforeach
                 </div>
+                @endif
+
+                {{-- Patrón semanal --}}
+                <div class="card border-0 bg-light">
+                    <div class="card-body pb-1">
+                        <label class="form-label fw-bold small mb-2"><i class="bi bi-calendar-week me-1"></i>Patrón semanal del nuevo médico</label>
+                        <div class="row g-1">
+                            @foreach(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as $di=>$dl)
+                            <div class="col">
+                                <label class="form-label small text-center d-block fw-bold {{ in_array($di,[5,6]) ? 'text-warning' : '' }}">{{ $dl }}</label>
+                                <select name="patron[{{ $di }}]" class="form-select form-select-sm text-center">
+                                    <option value="">—</option>
+                                    @foreach(['M','T','MT','N','MTN','MN','PER','INC'] as $c)
+                                        <option value="{{ $c }}">{{ $c }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Agregar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-person-check me-1"></i>Agregar médico
+                </button>
             </div>
         </form>
+    </div></div>
+</div>
+
+{{-- Modal: Editar datos del médico --}}
+<div class="modal fade" id="modalEditMedico" tabindex="-1">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        <div class="modal-header py-2">
+            <h6 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar médico</h6>
+            <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editMedicoId">
+            <div class="mb-2">
+                <label class="form-label small fw-semibold mb-1">Nombre</label>
+                <input type="text" id="editMedicoNombre" class="form-control form-control-sm" placeholder="Nombre">
+            </div>
+            <div class="mb-0">
+                <label class="form-label small fw-semibold mb-1">Apellido</label>
+                <input type="text" id="editMedicoApellido" class="form-control form-control-sm" placeholder="Apellido">
+            </div>
+        </div>
+        <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="guardarEditMedico()">
+                <i class="bi bi-check-lg me-1"></i>Guardar
+            </button>
+        </div>
     </div></div>
 </div>
 
@@ -421,6 +500,48 @@ function aplicarCodigo(codigo) {
             location.reload();
         } else {
             alert(data.mensaje || 'Error al guardar.');
+        }
+    })
+    .catch(() => alert('Error de comunicación.'));
+}
+
+// ── Editar datos del médico ──
+function abrirEditMedico(id, nombre, apellido) {
+    document.getElementById('editMedicoId').value       = id;
+    document.getElementById('editMedicoNombre').value   = nombre;
+    document.getElementById('editMedicoApellido').value = apellido;
+    new bootstrap.Modal(document.getElementById('modalEditMedico')).show();
+}
+
+function guardarEditMedico() {
+    const id       = document.getElementById('editMedicoId').value;
+    const nombre   = document.getElementById('editMedicoNombre').value.trim();
+    const apellido = document.getElementById('editMedicoApellido').value.trim();
+
+    if (!nombre) { alert('El nombre es obligatorio.'); return; }
+
+    fetch(`/turnos/editor/medico/${id}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+        },
+        body: JSON.stringify({ nombre, apellido })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            // Actualizar el nombre en la celda sin recargar
+            const cel = document.getElementById(`nombre-med-${id}`);
+            if (cel) {
+                // Preserve the button, only change text
+                const btn = cel.querySelector('button');
+                cel.textContent = data.nombre_completo + ' ';
+                if (btn) cel.appendChild(btn);
+            }
+            bootstrap.Modal.getInstance(document.getElementById('modalEditMedico')).hide();
+        } else {
+            alert('Error al guardar.');
         }
     })
     .catch(() => alert('Error de comunicación.'));
