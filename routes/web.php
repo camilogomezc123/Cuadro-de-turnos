@@ -21,6 +21,7 @@ use App\Http\Controllers\TurnoEditorController;
 use App\Http\Controllers\UciController;
 use App\Http\Controllers\MedicoPortalController;
 use App\Http\Controllers\BurnoutController;
+use App\Http\Controllers\MedicoDuplicadoController;
 use Illuminate\Support\Facades\Route;
 
 // ── Autenticación (públicas) ────────────────────────────────────
@@ -178,5 +179,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('/usuarios/{usuario}',          [AuthController::class, 'eliminarUsuario'])     ->name('usuarios.eliminar');
         Route::patch('/usuarios/{usuario}/password',  [AuthController::class, 'cambiarPassword'])     ->name('usuarios.password');
         Route::patch('/usuarios/{usuario}/toggle',    [AuthController::class, 'toggleUsuario'])       ->name('usuarios.toggle');
+
+        // Deduplicación de médicos
+        Route::get('/medicos/duplicados',             [MedicoDuplicadoController::class, 'index'])        ->name('medicos.duplicados.index');
+        Route::post('/medicos/duplicados/fusionar',   [MedicoDuplicadoController::class, 'fusionar'])     ->name('medicos.duplicados.fusionar');
+        Route::post('/medicos/duplicados/fusionar-todos', [MedicoDuplicadoController::class, 'fusionarTodos'])->name('medicos.duplicados.fusionar-todos');
     });
 });

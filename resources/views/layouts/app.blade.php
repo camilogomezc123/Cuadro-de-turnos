@@ -356,6 +356,21 @@
         <a class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}" href="{{ route('usuarios.index') }}">
             <i class="bi bi-people"></i> Usuarios Médicos
         </a>
+        @php
+            $nDup = cache()->remember('medicos_dup_count', 120, fn() =>
+                \Illuminate\Support\Facades\DB::table('medicos')
+                    ->selectRaw('COUNT(*) as cnt')
+                    ->fromSub(fn($q) => $q->from('medicos')
+                        ->selectRaw("LOWER(TRIM(nombre)) as n, LOWER(TRIM(IFNULL(apellido,''))) as a")
+                        ->groupByRaw("LOWER(TRIM(nombre)), LOWER(TRIM(IFNULL(apellido,'')))")
+                        ->havingRaw('COUNT(*) > 1'), 'sub')
+                    ->value('cnt') ?? 0
+            );
+        @endphp
+        <a class="nav-link {{ request()->routeIs('medicos.duplicados.*') ? 'active' : '' }}" href="{{ route('medicos.duplicados.index') }}">
+            <i class="bi bi-person-exclamation {{ $nDup>0 ? 'text-warning' : '' }}"></i> Médicos Duplicados
+            @if($nDup > 0)<span class="badge bg-warning text-dark ms-1">{{ $nDup }}</span>@endif
+        </a>
         @endif
         @endauth
     </div>
