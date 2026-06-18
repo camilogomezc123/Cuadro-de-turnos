@@ -76,7 +76,7 @@ class AuthController extends Controller
             'name'      => 'required|string|max:100',
             'email'     => 'required|email|unique:users',
             'password'  => 'required|min:6|confirmed',
-            'rol'       => 'required|in:master,coordinador,visualizador,medico',
+            'rol'       => 'required|in:master,medico',
             'medico_id' => 'nullable|exists:medicos,id',
         ]);
 
