@@ -254,19 +254,15 @@ class SecuenciaUciController extends Controller
             $slotMap = array_flip($slotsUsados); // original_week → slot_orden (0,1,2,...)
 
             foreach ($parsed['doctores'] as $doc) {
-                // Buscar o crear médico
+                // Buscar o crear médico — case-insensitive, tolera nombre completo en columna 'nombre'
                 $partes   = explode(' ', $doc['nombre'], 2);
                 $nombre   = $partes[0];
                 $apellido = $partes[1] ?? '';
 
-                $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombre)])
-                    ->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellido)])
-                    ->first()
-                    ?? Medico::whereRaw("LOWER(CONCAT(TRIM(nombre),' ',TRIM(apellido))) LIKE ?", ['%'.strtolower($doc['nombre']).'%'])
-                    ->first()
+                $medico = Medico::buscarPorNombreCompleto($doc['nombre'])
                     ?? Medico::create([
-                        'nombre'   => $nombre,
-                        'apellido' => $apellido,
+                        'nombre'   => mb_convert_case($nombre,   MB_CASE_TITLE, 'UTF-8'),
+                        'apellido' => mb_convert_case($apellido, MB_CASE_TITLE, 'UTF-8'),
                         'uci_id'   => $seq->uci_id,
                         'activo'   => true,
                     ]);
@@ -395,21 +391,15 @@ class SecuenciaUciController extends Controller
                          'VAC'=>0,'PER'=>0,'INC'=>0,'LIBRE'=>0,''=>0];
 
             foreach ($parsed['doctores'] as $doc) {
-                // Buscar o crear médico
+                // Buscar o crear médico — case-insensitive, tolera nombre completo en columna 'nombre'
                 $partes   = explode(' ', $doc['nombre'], 2);
                 $nombre   = $partes[0];
                 $apellido = $partes[1] ?? '';
 
-                $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombre)])
-                    ->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellido)])
-                    ->first()
-                    ?? Medico::whereRaw(
-                        "LOWER(CONCAT(TRIM(nombre),' ',TRIM(apellido))) LIKE ?",
-                        ['%'.strtolower($doc['nombre']).'%']
-                    )->first()
+                $medico = Medico::buscarPorNombreCompleto($doc['nombre'])
                     ?? Medico::create([
-                        'nombre'   => $nombre,
-                        'apellido' => $apellido,
+                        'nombre'   => mb_convert_case($nombre,   MB_CASE_TITLE, 'UTF-8'),
+                        'apellido' => mb_convert_case($apellido, MB_CASE_TITLE, 'UTF-8'),
                         'uci_id'   => $uci->id,
                         'activo'   => true,
                     ]);

@@ -324,6 +324,13 @@ class BurnoutController extends Controller
                 || ($tamizajePositivo && $nocturnos >= 4)
                 || ($tamizajePositivo && $diaLargo);
 
+            // clasificacion_realizacion_personal usa ENUM('alta','moderada','baja') — femenino
+            $clRP = match ($nivel) {
+                'alto'     => 'alta',
+                'moderado' => 'moderada',
+                default    => 'baja',
+            };
+
             $resultado = BurnoutResultado::updateOrCreate(
                 ['medico_id' => $medico->id, 'encuesta_id' => $encuesta->id, 'periodo_evaluado' => $periodo],
                 [
@@ -332,7 +339,7 @@ class BurnoutController extends Controller
                     'puntaje_despersonalizacion'          => $pDP,
                     'clasificacion_despersonalizacion'    => $nivel,
                     'puntaje_realizacion_personal'        => $pRP,
-                    'clasificacion_realizacion_personal'  => $nivel,
+                    'clasificacion_realizacion_personal'  => $clRP,
                     'burnout_positivo'         => $tamizajePositivo,
                     'burnout_severo'           => $alertaCritica,
                     'horas_programadas_mes'    => $horasMes,

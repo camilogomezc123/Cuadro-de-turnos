@@ -303,27 +303,14 @@ class TurnoEditorController extends Controller
         $mes  = (int)$request->mes;
         $anio = (int)$request->anio;
 
-        // Buscar o crear médico — búsqueda global por nombre (mismo médico puede tener turnos en varias UCIs)
+        // Buscar o crear médico — búsqueda global por nombre completo (case-insensitive,
+        // tolera nombre todo en columna 'nombre' con apellido=NULL O dividido en ambas)
         $medicoId = $request->medico_id;
         if (!$medicoId && $request->nombre_nuevo) {
             $nombreBuscar   = trim($request->nombre_nuevo);
             $apellidoBuscar = trim($request->apellido_nuevo ?? '');
 
-            // Búsqueda case-insensitive para evitar duplicados por mayúsculas/minúsculas
-            $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombreBuscar)])
-                ->when($apellidoBuscar,
-                    fn($q) => $q->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellidoBuscar)])
-                )
-                ->first();
-
-            if (!$medico) {
-                // Intentar coincidencia de nombre completo
-                $fullName = $apellidoBuscar ? "$nombreBuscar $apellidoBuscar" : $nombreBuscar;
-                $medico = Medico::whereRaw(
-                    "LOWER(TRIM(CONCAT(nombre,' ',IFNULL(apellido,'')))) = ?",
-                    [strtolower(trim($fullName))]
-                )->first();
-            }
+            $medico = Medico::buscarPorPartes($nombreBuscar, $apellidoBuscar);
 
             if (!$medico) {
                 $medico = Medico::create([
@@ -503,7 +490,7 @@ class TurnoEditorController extends Controller
         $medicoNuevoId = $request->medico_nuevo_id;
         if (!$medicoNuevoId && $request->nombre_nuevo) {
             $nomNuevo = trim($request->nombre_nuevo);
-            $mNuevo   = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nomNuevo)])->first()
+            $mNuevo   = Medico::buscarPorNombreCompleto($nomNuevo)
                 ?? Medico::create([
                     'nombre'  => mb_convert_case($nomNuevo, MB_CASE_TITLE, 'UTF-8'),
                     'uci_id'  => $turno->uci_id,

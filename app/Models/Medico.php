@@ -25,6 +25,24 @@ class Medico extends Model
         return trim($this->nombre . ' ' . $this->apellido);
     }
 
+    /**
+     * Busca un médico ignorando mayúsculas y si el nombre completo está
+     * todo en la columna 'nombre' (apellido=NULL) o dividido en ambas columnas.
+     */
+    public static function buscarPorNombreCompleto(string $nombreCompleto): ?self
+    {
+        $key = strtolower(trim(preg_replace('/\s+/', ' ', $nombreCompleto)));
+        return static::whereRaw(
+            "LOWER(TRIM(CONCAT_WS(' ', nombre, NULLIF(TRIM(IFNULL(apellido,'')),''))) ) = ?",
+            [$key]
+        )->first();
+    }
+
+    public static function buscarPorPartes(string $nombre, string $apellido = ''): ?self
+    {
+        return static::buscarPorNombreCompleto(trim("$nombre $apellido"));
+    }
+
     public function uci(): BelongsTo
     {
         return $this->belongsTo(Uci::class);

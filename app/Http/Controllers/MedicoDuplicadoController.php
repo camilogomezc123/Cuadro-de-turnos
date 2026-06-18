@@ -140,33 +140,48 @@ class MedicoDuplicadoController extends Controller
 
     // ── Helper: detectar duplicados ──────────────────────────────
 
+    private static function nombreFullKey(string $nombre, ?string $apellido): string
+    {
+        $full = trim($nombre);
+        if ($apellido && trim($apellido) !== '') {
+            $full .= ' ' . trim($apellido);
+        }
+        return strtolower(preg_replace('/\s+/', ' ', $full));
+    }
+
     private function detectarDuplicados(): array
     {
-        $rawGrupos = DB::table('medicos')
-            ->selectRaw("LOWER(TRIM(nombre)) as nom_key, LOWER(TRIM(IFNULL(apellido,''))) as ape_key, COUNT(*) as total")
-            ->groupByRaw("LOWER(TRIM(nombre)), LOWER(TRIM(IFNULL(apellido,'')))")
-            ->havingRaw('COUNT(*) > 1')
-            ->get();
+        // Agrupa por nombre completo normalizado (nombre + apellido en una sola cadena)
+        // Esto detecta tanto "DIEGO ESCOBAR"/NULL como "Diego"/"Escobar"
+        $rawGrupos = DB::select("
+            SELECT
+                LOWER(TRIM(CONCAT_WS(' ', nombre, NULLIF(TRIM(IFNULL(apellido,'')),''))) ) AS full_key,
+                GROUP_CONCAT(id ORDER BY id) AS ids,
+                COUNT(*) AS total
+            FROM medicos
+            GROUP BY LOWER(TRIM(CONCAT_WS(' ', nombre, NULLIF(TRIM(IFNULL(apellido,'')),''))) )
+            HAVING COUNT(*) > 1
+        ");
 
         $grupos = [];
         foreach ($rawGrupos as $g) {
-            $medicos = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [$g->nom_key])
-                ->whereRaw("LOWER(TRIM(IFNULL(apellido,''))) = ?", [$g->ape_key])
+            $ids    = explode(',', $g->ids);
+            $medicos = Medico::whereIn('id', $ids)
                 ->with('uci')
                 ->get()
                 ->map(fn($m) => [
-                    'id'           => $m->id,
-                    'nombre'       => $m->nombre,
-                    'apellido'     => $m->apellido,
+                    'id'              => $m->id,
+                    'nombre'          => $m->nombre,
+                    'apellido'        => $m->apellido,
                     'nombre_completo' => $m->nombre_completo,
-                    'uci'          => $m->uci?->codigo ?? '—',
-                    'activo'       => $m->activo,
-                    'total_turnos' => DB::table('turno_medicos')->where('medico_id', $m->id)->count(),
-                    'tiene_user'   => DB::table('users')->where('medico_id', $m->id)->exists(),
+                    'uci'             => $m->uci?->codigo ?? '—',
+                    'activo'          => $m->activo,
+                    'total_turnos'    => DB::table('turno_medicos')->where('medico_id', $m->id)->count(),
+                    'tiene_user'      => DB::table('users')->where('medico_id', $m->id)->exists(),
                 ]);
 
             $grupos[] = [
-                'llave'   => $g->nom_key . ' ' . $g->ape_key,
+                'llave'   => $g->full_key,
                 'medicos' => $medicos->sortByDesc('total_turnos')->values()->toArray(),
             ];
         }
