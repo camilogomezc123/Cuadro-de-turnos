@@ -50,8 +50,8 @@
                             <label class="form-label fw-semibold small">Año (opcional)</label>
                             <select name="anio" class="form-select">
                                 <option value="">— Auto —</option>
-                                @foreach(range(now()->year - 1, now()->year + 2) as $a)
-                                    <option value="{{ $a }}" {{ $a == now()->year ? 'selected':'' }}>{{ $a }}</option>
+                                @foreach(range(now()->year - 1, now()->year + 2) as $yr)
+                                    <option value="{{ $yr }}" {{ $yr == now()->year ? 'selected':'' }}>{{ $yr }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -129,20 +129,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($archivos as $a)
+                                @foreach($archivos as $arch)
                                 <tr>
                                     <td>
-                                        <strong>{{ $a->nombre_mes }} {{ $a->anio }}</strong>
+                                        <strong>{{ $arch->nombre_mes }} {{ $arch->anio }}</strong>
                                     </td>
                                     <td>
-                                        <span class="text-muted small" title="{{ $a->nombre_archivo }}">
-                                            {{ Str::limit($a->nombre_archivo, 25) }}
+                                        <span class="text-muted small" title="{{ $arch->nombre_archivo }}">
+                                            {{ Str::limit($arch->nombre_archivo, 25) }}
                                         </span>
                                     </td>
-                                    <td><span class="badge bg-primary-subtle text-primary">{{ $a->total_medicos }}</span></td>
-                                    <td><span class="badge bg-success-subtle text-success">{{ $a->total_turnos }}</span></td>
+                                    <td><span class="badge bg-primary-subtle text-primary">{{ $arch->total_medicos }}</span></td>
+                                    <td><span class="badge bg-success-subtle text-success">{{ $arch->total_turnos }}</span></td>
                                     <td>
-                                        @if($a->procesado)
+                                        @if($arch->procesado)
                                             <span class="badge bg-success-subtle text-success">
                                                 <i class="bi bi-check-circle me-1"></i>Procesado
                                             </span>
@@ -150,9 +150,9 @@
                                             <span class="badge bg-warning-subtle text-warning">Pendiente</span>
                                         @endif
                                     </td>
-                                    <td class="text-muted small">{{ $a->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="text-muted small">{{ $arch->created_at->format('d/m/Y H:i') }}</td>
                                     <td>
-                                        <form method="POST" action="{{ route('archivos.destroy', $a) }}"
+                                        <form method="POST" action="{{ route('archivos.destroy', $arch) }}"
                                               onsubmit="return confirm('¿Eliminar este período y todos sus datos?')">
                                             @csrf @method('DELETE')
                                             <button class="btn btn-sm btn-outline-danger" title="Eliminar">
@@ -161,23 +161,23 @@
                                         </form>
                                     </td>
                                 </tr>
-                                @if(!empty($a->errores))
+                                @if(!empty($arch->errores))
                                 <tr>
                                     <td colspan="7">
                                         <div class="alert alert-danger alert-sm mb-0 py-2 small">
                                             <i class="bi bi-exclamation-triangle me-1"></i>
-                                            {{ implode(' | ', $a->errores) }}
+                                            {{ implode(' | ', $arch->errores) }}
                                         </div>
                                     </td>
                                 </tr>
                                 @endif
-                                @if(!empty($a->advertencias))
+                                @if(!empty($arch->advertencias))
                                 <tr>
                                     <td colspan="7">
                                         <div class="alert alert-warning alert-sm mb-0 py-2 small">
                                             <i class="bi bi-info-circle me-1"></i>
-                                            @php $numAdv = count($a->advertencias); @endphp
-                                            {{ $numAdv }} advertencia(s): {{ implode(' | ', array_slice($a->advertencias, 0, 2)) }}
+                                            @php $numAdv = count($arch->advertencias); @endphp
+                                            {{ $numAdv }} advertencia(s): {{ implode(' | ', array_slice($arch->advertencias, 0, 2)) }}
                                             {{ $numAdv > 2 ? '... y ' . ($numAdv - 2) . ' más' : '' }}
                                         </div>
                                     </td>

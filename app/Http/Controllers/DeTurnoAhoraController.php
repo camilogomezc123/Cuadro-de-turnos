@@ -6,128 +6,175 @@ use App\Models\TurnoMedico;
 use App\Models\Uci;
 use App\Models\ArchivoCargado;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class DeTurnoAhoraController extends Controller
 {
-    public function index()
+    // Rangos de turno en minutos desde medianoche
+    const RANGOS = [
+        'M'   => ['ini' => 420,  'fin' => 780,  'label' => '07:00–13:00'],
+        'T'   => ['ini' => 780,  'fin' => 1140, 'label' => '13:00–19:00'],
+        'MT'  => ['ini' => 420,  'fin' => 1140, 'label' => '07:00–19:00'],
+        'N'   => ['ini' => 1140, 'fin' => 1920, 'label' => '19:00–07:00'],
+        'MTN' => ['ini' => 420,  'fin' => 1920, 'label' => '07:00–07:00 (+1)'],
+        'MN'  => ['ini' => 420,  'fin' => 1920, 'label' => '07:00–07:00 (+1)'],
+    ];
+
+    public function index(Request $request)
     {
-        $ahora    = Carbon::now();
-        $hoy      = $ahora->toDateString();
-        $horaAhora= $ahora->hour * 60 + $ahora->minute; // minutos desde medianoche
-        $ucis     = Uci::where('activa', true)->orderBy('nombre')->get();
+        $ahora   = Carbon::now();
+        $minutos = $ahora->hour * 60 + $ahora->minute;
 
-        // Buscar el archivo del mes actual (o el más reciente)
-        $archivo = ArchivoCargado::where('procesado', true)
-            ->where('mes', $ahora->month)
-            ->where('anio', $ahora->year)
-            ->first()
-            ?? ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->first();
+        // Semana solicitada (por defecto: semana actual)
+        $fechaRef = $request->filled('fecha')
+            ? Carbon::parse($request->fecha)
+            : $ahora->copy();
 
-        $tarjetas = [];
+        $inicioSemana = $fechaRef->copy()->startOfWeek(Carbon::MONDAY);
+        $finSemana    = $fechaRef->copy()->endOfWeek(Carbon::SUNDAY);
 
-        if ($archivo) {
-            foreach ($ucis as $uci) {
-                // Turnos de hoy y ayer en esta UCI (para cubrir noches que empezaron ayer)
-                $turnosHoy  = TurnoMedico::with('medico')
-                    ->where('archivo_id', $archivo->id)
-                    ->where('uci_id', $uci->id)
-                    ->where('fecha', $hoy)
-                    ->whereNotIn('codigo_turno', ['', 'LIBRE'])
-                    ->where('horas_total', '>', 0)
-                    ->orderBy('codigo_turno')
-                    ->get();
-
-                $turnosAyer = TurnoMedico::with('medico')
-                    ->where('archivo_id', $archivo->id)
-                    ->where('uci_id', $uci->id)
-                    ->where('fecha', $ahora->copy()->subDay()->toDateString())
-                    ->whereIn('codigo_turno', ['N', 'MTN', 'MN'])
-                    ->get();
-
-                // Determinar qué turno está activo AHORA
-                // M:   07:00–13:00  (420–780 min)
-                // T:   13:00–19:00  (780–1140 min)
-                // MT:  07:00–19:00  (420–1140 min)
-                // N:   19:00–07:00  (1140+ o 0–420 del día siguiente)
-                // MTN: 07:00–07:00 siguiente (420 en adelante, todo el día)
-                $ahora_turno = $this->calcularTurnoActivo($horaAhora);
-
-                $turnosActivos   = [];
-                $turnosProximos  = [];
-
-                // Noches de ayer que siguen activas (hasta las 07:00)
-                if ($horaAhora < 420) { // antes de 7am
-                    foreach ($turnosAyer as $t) {
-                        $turnosActivos[] = [
-                            'medico'      => $t->medico->nombre,
-                            'codigo'      => $t->codigo_turno,
-                            'hora_inicio' => '19:00',
-                            'hora_fin'    => '07:00',
-                            'horas'       => $t->horas_total,
-                        ];
-                    }
-                }
-
-                foreach ($turnosHoy as $t) {
-                    $info = $this->infoTurnoActivo($t->codigo_turno, $horaAhora);
-                    if ($info['activo']) {
-                        $turnosActivos[] = [
-                            'medico'      => $t->medico->nombre,
-                            'codigo'      => $t->codigo_turno,
-                            'hora_inicio' => $info['hora_inicio'],
-                            'hora_fin'    => $info['hora_fin'],
-                            'horas'       => $t->horas_total,
-                        ];
-                    } else {
-                        $turnosProximos[] = [
-                            'medico'      => $t->medico->nombre,
-                            'codigo'      => $t->codigo_turno,
-                            'hora_inicio' => $info['hora_inicio'],
-                        ];
-                    }
-                }
-
-                $tarjetas[] = [
-                    'uci'             => $uci,
-                    'turno_actual'    => $ahora_turno,
-                    'activos'         => $turnosActivos,
-                    'proximos'        => $turnosProximos,
-                    'cobertura_ok'    => !empty($turnosActivos),
-                ];
-            }
+        // Días de la semana con fechas
+        $diasSemana = [];
+        for ($d = 0; $d < 7; $d++) {
+            $dia = $inicioSemana->copy()->addDays($d);
+            $diasSemana[] = [
+                'fecha'       => $dia->toDateString(),
+                'label_corto' => $dia->locale('es')->isoFormat('ddd D'),   // lun 16
+                'label_dia'   => $dia->locale('es')->isoFormat('dddd'),     // lunes
+                'es_hoy'      => $dia->isToday(),
+                'es_finde'    => $dia->isWeekend(),
+                'numero'      => $dia->day,
+            ];
         }
 
-        return view('de-turno-ahora.index', compact(
-            'tarjetas', 'ahora', 'ucis', 'archivo'
-        ));
+        // Archivos que cubren esta semana (pueden ser de 2 meses distintos)
+        $archivosIds = $this->archivosParaRango($inicioSemana, $finSemana);
+
+        $ucis = Uci::where('activa', true)->orderBy('nombre')->get();
+
+        // ── DATOS POR UCI ────────────────────────────────────────
+        // $datosUci[$uciCodigo]['medicos'][$nombre][$fecha] = codigo_turno
+        $datosUci = [];
+        foreach ($ucis as $uci) {
+            $datosUci[$uci->codigo] = [
+                'uci'     => $uci,
+                'medicos' => [],   // nombre => [fecha => codigo]
+            ];
+        }
+
+        if (!empty($archivosIds)) {
+            $fechas = array_column($diasSemana, 'fecha');
+
+            $turnos = TurnoMedico::with('medico', 'uci')
+                ->whereIn('archivo_id', $archivosIds)
+                ->whereIn('fecha', $fechas)
+                ->whereNotIn('codigo_turno', ['', 'LIBRE'])
+                ->get();
+
+            foreach ($turnos as $t) {
+                $cod = $t->uci->codigo ?? null;
+                if (!$cod || !isset($datosUci[$cod])) continue;
+
+                $nombre = $t->medico->nombre ?? '?';
+                $fecha  = $t->fecha->toDateString();
+                $codigo = $t->codigo_turno;
+
+                if (!isset($datosUci[$cod]['medicos'][$nombre])) {
+                    $datosUci[$cod]['medicos'][$nombre] = [];
+                }
+                $datosUci[$cod]['medicos'][$nombre][$fecha] = $codigo;
+            }
+
+            // Ordenar médicos alfabéticamente
+            foreach ($datosUci as &$datos) {
+                ksort($datos['medicos']);
+            }
+            unset($datos);
+        }
+
+        // ── TURNO ACTIVO HOY ─────────────────────────────────────
+        $hoy          = $ahora->toDateString();
+        $turnoActivo  = $this->labelTurnoActivo($minutos);
+        $resumenHoy   = [];
+
+        foreach ($ucis as $uci) {
+            $cod      = $uci->codigo;
+            $activos  = [];
+            $proximos = [];
+
+            if (isset($datosUci[$cod]['medicos'])) {
+                foreach ($datosUci[$cod]['medicos'] as $nombre => $diasMedico) {
+                    $codigoHoy = $diasMedico[$hoy] ?? '';
+                    if (empty($codigoHoy)) continue;
+
+                    $estaActivo = $this->estaActivo($codigoHoy, $minutos);
+                    $rango = self::RANGOS[$codigoHoy] ?? null;
+
+                    if ($estaActivo) {
+                        $activos[] = ['medico' => $nombre, 'codigo' => $codigoHoy, 'label' => $rango['label'] ?? ''];
+                    } else {
+                        $proximos[] = ['medico' => $nombre, 'codigo' => $codigoHoy, 'label' => $rango['label'] ?? ''];
+                    }
+                }
+            }
+
+            $resumenHoy[$cod] = [
+                'uci'      => $uci,
+                'activos'  => $activos,
+                'proximos' => $proximos,
+            ];
+        }
+
+        return view('de-turno-ahora.index', [
+            'diasSemana'    => $diasSemana,
+            'inicioSemana'  => $inicioSemana,
+            'finSemana'     => $finSemana,
+            'semanaAnterior'=> $inicioSemana->copy()->subWeek()->toDateString(),
+            'semanaSiguiente'=> $inicioSemana->copy()->addWeek()->toDateString(),
+            'datosUci'      => $datosUci,
+            'ucis'          => $ucis,
+            'resumenHoy'    => $resumenHoy,
+            'ahora'         => $ahora,
+            'turnoActivo'   => $turnoActivo,
+            'hayDatos'      => !empty($archivosIds),
+        ]);
     }
 
-    private function calcularTurnoActivo(int $minutos): string
+    // ── Helpers ──────────────────────────────────────────────────
+
+    private function archivosParaRango(Carbon $inicio, Carbon $fin): array
     {
-        if ($minutos >= 420 && $minutos < 780)  return 'Mañana (07:00–13:00)';
-        if ($minutos >= 780 && $minutos < 1140) return 'Tarde (13:00–19:00)';
-        return 'Noche (19:00–07:00)';
+        $ids = [];
+        $cur = $inicio->copy()->startOfMonth();
+
+        while ($cur->lte($fin)) {
+            $archivo = ArchivoCargado::where('procesado', true)
+                ->where('mes', $cur->month)
+                ->where('anio', $cur->year)
+                ->value('id');
+
+            if ($archivo) $ids[] = $archivo;
+            $cur->addMonth();
+        }
+
+        return array_unique($ids);
     }
 
-    private function infoTurnoActivo(string $codigo, int $minutos): array
+    private function estaActivo(string $codigo, int $minutos): bool
     {
-        $rangos = [
-            'M'   => ['inicio' => 420,  'fin' => 780,  'h_inicio' => '07:00', 'h_fin' => '13:00'],
-            'T'   => ['inicio' => 780,  'fin' => 1140, 'h_inicio' => '13:00', 'h_fin' => '19:00'],
-            'MT'  => ['inicio' => 420,  'fin' => 1140, 'h_inicio' => '07:00', 'h_fin' => '19:00'],
-            'N'   => ['inicio' => 1140, 'fin' => 1920, 'h_inicio' => '19:00', 'h_fin' => '07:00'],
-            'MTN' => ['inicio' => 420,  'fin' => 1920, 'h_inicio' => '07:00', 'h_fin' => '07:00'],
-            'MN'  => ['inicio' => 420,  'fin' => 780,  'h_inicio' => '07:00', 'h_fin' => '07:00'],
-        ];
+        $r = self::RANGOS[$codigo] ?? null;
+        if (!$r) return false;
 
-        $r = $rangos[$codigo] ?? null;
-        if (!$r) return ['activo' => false, 'hora_inicio' => '--:--', 'hora_fin' => '--:--'];
+        if (in_array($codigo, ['N', 'MTN', 'MN'])) {
+            return $minutos >= $r['ini'] || $minutos < 420;
+        }
+        return $minutos >= $r['ini'] && $minutos < $r['fin'];
+    }
 
-        $activo = $minutos >= $r['inicio'] && $minutos < $r['fin'];
-        // Para N: también activo si es antes de 7am (minutos < 420 del día siguiente)
-        if ($codigo === 'N' && $minutos < 420) $activo = true;
-        if ($codigo === 'MTN' && $minutos < 420) $activo = true;
-
-        return ['activo' => $activo, 'hora_inicio' => $r['h_inicio'], 'hora_fin' => $r['h_fin']];
+    private function labelTurnoActivo(int $min): string
+    {
+        if ($min >= 420  && $min < 780)  return 'Mañana · 07:00–13:00';
+        if ($min >= 780  && $min < 1140) return 'Tarde · 13:00–19:00';
+        return 'Noche · 19:00–07:00';
     }
 }
