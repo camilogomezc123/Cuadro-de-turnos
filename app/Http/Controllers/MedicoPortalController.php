@@ -21,18 +21,19 @@ class MedicoPortalController extends Controller
     public function __construct(
         private HoraConsolidadoService $horaService,
         private ConflictoService       $conflictoService,
-    ) {
-        $this->middleware(function ($request, $next) {
-            $user = Auth::user();
-            if (!$user->esMedico() || !$user->medico_id) {
-                abort(403, 'Acceso solo para médicos con perfil vinculado.');
-            }
-            return $next($request);
-        });
+    ) {}
+
+    private function requireMedico(): void
+    {
+        $user = Auth::user();
+        if (!$user->esMedico() || !$user->medico_id) {
+            abort(403, 'Acceso solo para médicos con perfil vinculado.');
+        }
     }
 
     public function portal(Request $request)
     {
+        $this->requireMedico();
         $user   = Auth::user();
         $medico = $user->medico;
 
@@ -135,6 +136,7 @@ class MedicoPortalController extends Controller
 
     public function ofrecerTurno(Request $request)
     {
+        $this->requireMedico();
         $request->validate([
             'turno_id' => 'required|exists:turno_medicos,id',
             'motivo'   => 'nullable|string|max:300',
@@ -175,6 +177,7 @@ class MedicoPortalController extends Controller
 
     public function aceptarOferta(Request $request, SolicitudCambioTurno $solicitud)
     {
+        $this->requireMedico();
         $medico = Auth::user()->medico;
 
         if ($solicitud->medico_solicitante_id === $medico->id) {
@@ -202,6 +205,7 @@ class MedicoPortalController extends Controller
 
     public function solicitarCambio(Request $request)
     {
+        $this->requireMedico();
         $request->validate([
             'tipo_movimiento'    => 'required|in:cambio_directo,donacion_directa',
             'turno_origen_id'    => 'required|exists:turno_medicos,id',
@@ -241,6 +245,7 @@ class MedicoPortalController extends Controller
 
     public function responderCambio(Request $request, SolicitudCambioTurno $solicitud)
     {
+        $this->requireMedico();
         $medico = Auth::user()->medico;
 
         if ($solicitud->medico_receptor_id !== $medico->id) abort(403);
@@ -269,6 +274,7 @@ class MedicoPortalController extends Controller
 
     public function cancelarCambio(SolicitudCambioTurno $solicitud)
     {
+        $this->requireMedico();
         $medico = Auth::user()->medico;
         if ($solicitud->medico_solicitante_id !== $medico->id) abort(403);
 
@@ -355,6 +361,7 @@ class MedicoPortalController extends Controller
 
     public function turnosMedico(Request $request)
     {
+        $this->requireMedico();
         $medicoId = (int)$request->medico_id;
         $mes      = (int)($request->mes  ?? now()->month);
         $anio     = (int)($request->anio ?? now()->year);
