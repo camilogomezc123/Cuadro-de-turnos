@@ -75,12 +75,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/turnos/editor/aprobar-cambio/{sol}',  [TurnoEditorController::class, 'aprobarCambio'])   ->name('turno-editor.aprobar-cambio');
 
         // Secuencias UCI
-        Route::get('/secuencias',                              [SecuenciaUciController::class, 'index'])       ->name('secuencias.index');
-        Route::post('/secuencias',                             [SecuenciaUciController::class, 'store'])        ->name('secuencias.store');
-        Route::post('/secuencias/{secuencia}/aplicar-mes',    [SecuenciaUciController::class, 'aplicarMes'])   ->name('secuencias.aplicar-mes');
-        Route::post('/secuencias/{secuencia}/aplicar-anio',   [SecuenciaUciController::class, 'aplicarAnio'])  ->name('secuencias.aplicar-anio');
-        Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])->name('secuencias.agregar-medico');
-        Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])       ->name('secuencias.destroy');
+        Route::get('/secuencias',                              [SecuenciaUciController::class, 'index'])          ->name('secuencias.index');
+        Route::post('/secuencias',                             [SecuenciaUciController::class, 'store'])           ->name('secuencias.store');
+        Route::get('/secuencias/cargar-excel',                 [SecuenciaUciController::class, 'cargarExcelForm']) ->name('secuencias.cargar-excel');
+        Route::post('/secuencias/cargar-excel',                [SecuenciaUciController::class, 'parsearExcel'])    ->name('secuencias.parsear-excel');
+        Route::post('/secuencias/{secuencia}/aplicar-meses',   [SecuenciaUciController::class, 'aplicarMeses'])   ->name('secuencias.aplicar-meses');
+        Route::post('/secuencias/{secuencia}/aplicar-mes',    [SecuenciaUciController::class, 'aplicarMes'])      ->name('secuencias.aplicar-mes');
+        Route::post('/secuencias/{secuencia}/aplicar-anio',   [SecuenciaUciController::class, 'aplicarAnio'])     ->name('secuencias.aplicar-anio');
+        Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])   ->name('secuencias.agregar-medico');
+        Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])          ->name('secuencias.destroy');
 
         // Novedades
         Route::get('/novedades',                          [NovedadController::class, 'index'])               ->name('novedades.index');

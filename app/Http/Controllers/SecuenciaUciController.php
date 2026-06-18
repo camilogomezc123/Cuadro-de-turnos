@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 class SecuenciaUciController extends Controller
 {
@@ -193,6 +195,287 @@ class SecuenciaUciController extends Controller
     {
         $secuencia->update(['activa' => false]);
         return back()->with('success', 'Secuencia desactivada.');
+    }
+
+    // ── Carga de Excel por UCI ───────────────────────────────────
+
+    public function cargarExcelForm(Request $request)
+    {
+        $ucis  = Uci::where('activa', true)->orderBy('nombre')->get();
+        $meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        $anios = range(now()->year - 1, now()->year + 3);
+
+        // Si viene de un parse exitoso, mostrar preview
+        $preview = session('secuencia_preview');
+
+        return view('secuencias.cargar-excel', compact('ucis','meses','anios','preview'));
+    }
+
+    public function parsearExcel(Request $request)
+    {
+        $request->validate([
+            'uci_id' => 'required|exists:ucis,id',
+            'nombre' => 'required|string|max:120',
+            'anio'   => 'required|integer|min:2020|max:2035',
+            'excel'  => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $uci = Uci::findOrFail($request->uci_id);
+
+        try {
+            $parsed = $this->parseExcelSecuencia($request->file('excel'));
+        } catch (\Throwable $e) {
+            return back()->withErrors(['excel' => 'Error al leer el archivo: ' . $e->getMessage()])->withInput();
+        }
+
+        if (empty($parsed['doctores'])) {
+            return back()->withErrors(['excel' => 'No se encontraron médicos en el archivo. Verifique que la columna A tenga los nombres.'])->withInput();
+        }
+
+        // Guardar secuencia en BD
+        $secuencia = DB::transaction(function () use ($request, $uci, $parsed) {
+            $seq = SecuenciaUci::create([
+                'uci_id'               => $uci->id,
+                'nombre'               => $request->nombre,
+                'anio'                 => $request->anio,
+                'activa'               => true,
+                'creada_por_usuario_id'=> Auth::id(),
+            ]);
+
+            // Determinar slots de rotación de fin de semana
+            $slotsUsados = [];
+            foreach ($parsed['doctores'] as $doc) {
+                if ($doc['weekend_slot'] !== null && !in_array($doc['weekend_slot'], $slotsUsados)) {
+                    $slotsUsados[] = $doc['weekend_slot'];
+                }
+            }
+            sort($slotsUsados);
+            $slotMap = array_flip($slotsUsados); // original_week → slot_orden (0,1,2,...)
+
+            foreach ($parsed['doctores'] as $doc) {
+                // Buscar o crear médico
+                $partes   = explode(' ', $doc['nombre'], 2);
+                $nombre   = $partes[0];
+                $apellido = $partes[1] ?? '';
+
+                $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombre)])
+                    ->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellido)])
+                    ->first()
+                    ?? Medico::whereRaw("LOWER(CONCAT(TRIM(nombre),' ',TRIM(apellido))) LIKE ?", ['%'.strtolower($doc['nombre']).'%'])
+                    ->first()
+                    ?? Medico::create([
+                        'nombre'   => $nombre,
+                        'apellido' => $apellido,
+                        'uci_id'   => $seq->uci_id,
+                        'activo'   => true,
+                    ]);
+
+                // Días hábiles (Lun=0 … Vie=4)
+                foreach ($doc['patron_fijo'] as $dia => $codigo) {
+                    SecuenciaUciDetalle::create([
+                        'secuencia_uci_id' => $seq->id,
+                        'medico_id'        => $medico->id,
+                        'dia_semana'       => (int)$dia,
+                        'codigo_turno'     => $codigo,
+                        'es_fin_de_semana' => false,
+                    ]);
+                }
+
+                // Fin de semana (Sáb=5, Dom=6)
+                if ($doc['weekend_slot'] !== null) {
+                    $orden   = $slotMap[$doc['weekend_slot']] ?? 0;
+                    $weekRot = $doc['weekend_rot'][$doc['weekend_slot']] ?? [];
+
+                    foreach ([5 => ($weekRot['sab'] ?? ''), 6 => ($weekRot['dom'] ?? '')] as $dia => $codigo) {
+                        if ($codigo !== '') {
+                            SecuenciaUciDetalle::create([
+                                'secuencia_uci_id'            => $seq->id,
+                                'medico_id'                   => $medico->id,
+                                'dia_semana'                  => $dia,
+                                'codigo_turno'                => $codigo,
+                                'es_fin_de_semana'            => true,
+                                'orden_rotacion_fin_semana'   => $orden,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            return $seq;
+        });
+
+        // Preview para la vista de aplicación de meses
+        session(['secuencia_preview' => [
+            'id'       => $secuencia->id,
+            'nombre'   => $secuencia->nombre,
+            'uci'      => $uci->nombre,
+            'anio'     => $request->anio,
+            'doctores' => array_map(fn($d) => $d['nombre'], $parsed['doctores']),
+            'semanas'  => $parsed['num_semanas'],
+        ]]);
+
+        return redirect()->route('secuencias.cargar-excel')
+            ->with('success', "Secuencia \"{$secuencia->nombre}\" creada con " . count($parsed['doctores']) . ' médicos. Ahora selecciona los meses a programar.');
+    }
+
+    // Aplicar secuencia a varios meses a la vez
+    public function aplicarMeses(Request $request, SecuenciaUci $secuencia)
+    {
+        $request->validate([
+            'meses_anio' => 'required|array|min:1',
+        ]);
+
+        $total   = 0;
+        $errores = [];
+
+        foreach ($request->meses_anio as $mesAnio) {
+            [$mes, $anio] = explode('-', $mesAnio);
+            try {
+                $r = $this->generarTurnosDesdeSecuencia($secuencia, (int)$mes, (int)$anio);
+                $total += $r['turnos_creados'];
+            } catch (\Throwable $e) {
+                $errores[] = "{$mes}/{$anio}: " . $e->getMessage();
+            }
+        }
+
+        $msg = "{$total} turnos programados en " . count($request->meses_anio) . ' mes(es).';
+        if ($errores) $msg .= ' Errores: ' . implode('; ', $errores);
+
+        return back()->with('success', $msg);
+    }
+
+    // ── Parser Excel ─────────────────────────────────────────────
+
+    private function parseExcelSecuencia(\Illuminate\Http\UploadedFile $file): array
+    {
+        $spreadsheet = IOFactory::load($file->getPathname());
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        $maxRow = $sheet->getHighestDataRow();
+        $maxCol = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+
+        $letrasValidas = ['L','M','J','V','S','D'];
+
+        // Buscar fila de encabezado (contiene L, M, M, J, V, S, D repeating)
+        $headerRow  = null;
+        $diasStartCol = null;
+
+        for ($row = 1; $row <= min($maxRow, 15); $row++) {
+            $encontradas = 0;
+            $primeraLetra = null;
+            for ($col = 1; $col <= min($maxCol, 60); $col++) {
+                $v = strtoupper(trim((string)$sheet->getCell([$col, $row])->getValue()));
+                if (in_array($v, $letrasValidas)) {
+                    $encontradas++;
+                    if ($primeraLetra === null) {
+                        $primeraLetra = $col;
+                    }
+                }
+            }
+            if ($encontradas >= 5) {
+                $headerRow    = $row;
+                $diasStartCol = $primeraLetra;
+                break;
+            }
+        }
+
+        if (!$headerRow) {
+            throw new \Exception('No se encontró la fila con letras de días (L/M/J/V/S/D). Verifique el formato del Excel.');
+        }
+
+        // Columna de nombres = la columna inmediatamente antes de los días, o col 1
+        $nombreCol = max(1, $diasStartCol - 1);
+
+        // Mapear columnas: cada columna day → [dia_idx 0-6, semana_num]
+        $colMap = [];
+        $daySeq = [0, 1, 2, 3, 4, 5, 6]; // Lun, Mar, Mié, Jue, Vie, Sáb, Dom
+        $pos    = 0;
+        for ($col = $diasStartCol; $col <= $maxCol; $col++) {
+            $v = strtoupper(trim((string)$sheet->getCell([$col, $headerRow])->getValue()));
+            if (in_array($v, $letrasValidas)) {
+                $colMap[$col] = [
+                    'dia'    => $daySeq[$pos % 7],
+                    'semana' => intdiv($pos, 7),
+                ];
+                $pos++;
+            }
+        }
+
+        $numSemanas = (int)ceil($pos / 7);
+
+        // Detectar nombre de la UCI (texto antes del encabezado)
+        $uciNombreDetectado = null;
+        for ($row = 1; $row < $headerRow; $row++) {
+            for ($col = 1; $col <= $maxCol; $col++) {
+                $v = trim((string)$sheet->getCell([$col, $row])->getValue());
+                if ($v && !in_array(strtoupper($v), $letrasValidas)) {
+                    $uciNombreDetectado = $v;
+                    break 2;
+                }
+            }
+        }
+
+        // Parsear médicos
+        $codigosValidos = ['M','T','MT','N','MTN','MN','VAC','PER','INC','LIBRE'];
+        $doctores = [];
+
+        for ($row = $headerRow + 1; $row <= $maxRow; $row++) {
+            $nombre = trim((string)$sheet->getCell([$nombreCol, $row])->getValue());
+            if (empty($nombre)) continue;
+            // Ignorar filas de totales o encabezados repetidos
+            if (in_array(strtoupper($nombre), ['MÉDICO','MEDICO','NOMBRE','TOTAL'])) continue;
+
+            // Recopilar códigos por [dia][semana]
+            $cdsPorDiaSemana = [];
+            foreach ($colMap as $col => $info) {
+                $raw = strtoupper(trim((string)$sheet->getCell([$col, $row])->getValue()));
+                // Solo guardar si es un código válido
+                $codigo = in_array($raw, $codigosValidos) ? $raw : '';
+                $cdsPorDiaSemana[$info['dia']][$info['semana']] = $codigo;
+            }
+
+            // Patrón fijo (Lun–Vie): código más frecuente por día
+            $patronFijo = [];
+            for ($d = 0; $d <= 4; $d++) {
+                $semanas = $cdsPorDiaSemana[$d] ?? [];
+                $noVacios = array_filter($semanas, fn($c) => $c !== '');
+                if (empty($noVacios)) {
+                    $patronFijo[$d] = '';
+                } else {
+                    $counts = array_count_values($noVacios);
+                    arsort($counts);
+                    $patronFijo[$d] = array_key_first($counts);
+                }
+            }
+
+            // Rotación fines de semana: detectar primera semana con turno
+            $weekendRot   = [];
+            $weekendSlot  = null;
+            for ($semana = 0; $semana < $numSemanas; $semana++) {
+                $sab = $cdsPorDiaSemana[5][$semana] ?? '';
+                $dom = $cdsPorDiaSemana[6][$semana] ?? '';
+                if ($sab !== '' || $dom !== '') {
+                    $weekendRot[$semana] = ['sab' => $sab, 'dom' => $dom];
+                    if ($weekendSlot === null) {
+                        $weekendSlot = $semana; // primera semana donde trabaja fin de semana
+                    }
+                }
+            }
+
+            $doctores[] = [
+                'nombre'         => $nombre,
+                'patron_fijo'    => $patronFijo,
+                'weekend_rot'    => $weekendRot,
+                'weekend_slot'   => $weekendSlot,
+            ];
+        }
+
+        return [
+            'uci_nombre'  => $uciNombreDetectado,
+            'num_semanas' => $numSemanas,
+            'doctores'    => $doctores,
+        ];
     }
 
     // ── Helper privado ──────────────────────────────────────────

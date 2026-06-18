@@ -283,8 +283,11 @@
         <a class="nav-link {{ request()->routeIs('archivos.*') ? 'active' : '' }}" href="{{ route('archivos.index') }}">
             <i class="bi bi-cloud-upload"></i> Importar Excel
         </a>
-        <a class="nav-link {{ request()->routeIs('secuencias.*') ? 'active' : '' }}" href="{{ route('secuencias.index') }}">
+        <a class="nav-link {{ request()->routeIs('secuencias.index') ? 'active' : '' }}" href="{{ route('secuencias.index') }}">
             <i class="bi bi-calendar-week"></i> Secuencias UCI
+        </a>
+        <a class="nav-link {{ request()->routeIs('secuencias.cargar-excel') ? 'active' : '' }}" href="{{ route('secuencias.cargar-excel') }}">
+            <i class="bi bi-file-earmark-arrow-up"></i> Cargar Secuencia Excel
         </a>
         <a class="nav-link {{ request()->routeIs('turno-editor.*') ? 'active' : '' }}" href="{{ route('turno-editor.index') }}">
             <i class="bi bi-pencil-square"></i> Editor de Turnos
