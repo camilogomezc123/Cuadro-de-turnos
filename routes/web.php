@@ -136,7 +136,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/ausencias/{ausencia}/rechazar',[AusenciaController::class, 'rechazar'])->name('ausencias.rechazar');
 
         // Cambios de turno: acciones solo maestro
-        Route::post('/cambios-turno', [CambioTurnoController::class, 'store'])->name('cambios-turno.create');
+        Route::post('/cambios-turno', [CambioTurnoController::class, 'store'])->name('cambios-turno.store');
         Route::patch('/cambios-turno/{cambio}/aceptar',        [CambioTurnoController::class, 'aceptar'])       ->name('cambios-turno.aceptar');
         Route::patch('/cambios-turno/{cambio}/rechazar-colega',[CambioTurnoController::class, 'rechazarColega'])->name('cambios-turno.rechazar-colega');
         Route::patch('/cambios-turno/{cambio}/aprobar',        [CambioTurnoController::class, 'aprobar'])        ->name('cambios-turno.aprobar');
