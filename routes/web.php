@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/secuencias',                             [SecuenciaUciController::class, 'store'])           ->name('secuencias.store');
         Route::get('/secuencias/cargar-excel',                 [SecuenciaUciController::class, 'cargarExcelForm']) ->name('secuencias.cargar-excel');
         Route::post('/secuencias/cargar-excel',                [SecuenciaUciController::class, 'parsearExcel'])    ->name('secuencias.parsear-excel');
+        Route::post('/secuencias/importar-calendario',         [SecuenciaUciController::class, 'importarCalendario'])->name('secuencias.importar-calendario');
         Route::post('/secuencias/{secuencia}/aplicar-meses',   [SecuenciaUciController::class, 'aplicarMeses'])   ->name('secuencias.aplicar-meses');
         Route::post('/secuencias/{secuencia}/aplicar-mes',    [SecuenciaUciController::class, 'aplicarMes'])      ->name('secuencias.aplicar-mes');
         Route::post('/secuencias/{secuencia}/aplicar-anio',   [SecuenciaUciController::class, 'aplicarAnio'])     ->name('secuencias.aplicar-anio');

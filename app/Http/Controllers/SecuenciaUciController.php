@@ -345,6 +345,208 @@ class SecuenciaUciController extends Controller
         return back()->with('success', $msg);
     }
 
+    // ── Importar calendario mensual directo ─────────────────────
+
+    public function importarCalendario(Request $request)
+    {
+        $request->validate([
+            'uci_id' => 'required|exists:ucis,id',
+            'mes'    => 'required|integer|between:1,12',
+            'anio'   => 'required|integer|min:2020|max:2035',
+            'excel'  => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $uci       = Uci::findOrFail($request->uci_id);
+        $mes       = (int)$request->mes;
+        $anio      = (int)$request->anio;
+        $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
+
+        try {
+            $parsed = $this->parseCalendarioMensual($request->file('excel'), $mes, $anio, $diasEnMes);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['excel_cal' => 'Error al leer el archivo: ' . $e->getMessage()])->withInput();
+        }
+
+        if (empty($parsed['doctores'])) {
+            return back()->withErrors(['excel_cal' => 'No se encontraron médicos. Verifique que la columna A tenga los nombres.'])->withInput();
+        }
+
+        $totalTurnos = 0;
+
+        DB::transaction(function () use ($uci, $mes, $anio, $diasEnMes, $parsed, &$totalTurnos) {
+            // Buscar o crear archivo del mes
+            $archivo = ArchivoCargado::firstOrCreate(
+                ['mes' => $mes, 'anio' => $anio],
+                [
+                    'nombre_archivo' => "Importado {$uci->codigo} {$mes}/{$anio}",
+                    'ruta'           => '',
+                    'procesado'      => true,
+                    'total_medicos'  => 0,
+                    'total_turnos'   => 0,
+                ]
+            );
+
+            // Borrar turnos previos de esta UCI en este mes
+            TurnoMedico::where('archivo_id', $archivo->id)
+                ->where('uci_id', $uci->id)
+                ->delete();
+
+            $horasMap = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'MTN'=>24,'MN'=>18,
+                         'VAC'=>0,'PER'=>0,'INC'=>0,'LIBRE'=>0,''=>0];
+
+            foreach ($parsed['doctores'] as $doc) {
+                // Buscar o crear médico
+                $partes   = explode(' ', $doc['nombre'], 2);
+                $nombre   = $partes[0];
+                $apellido = $partes[1] ?? '';
+
+                $medico = Medico::whereRaw('LOWER(TRIM(nombre)) = ?', [strtolower($nombre)])
+                    ->whereRaw('LOWER(TRIM(apellido)) = ?', [strtolower($apellido)])
+                    ->first()
+                    ?? Medico::whereRaw(
+                        "LOWER(CONCAT(TRIM(nombre),' ',TRIM(apellido))) LIKE ?",
+                        ['%'.strtolower($doc['nombre']).'%']
+                    )->first()
+                    ?? Medico::create([
+                        'nombre'   => $nombre,
+                        'apellido' => $apellido,
+                        'uci_id'   => $uci->id,
+                        'activo'   => true,
+                    ]);
+
+                $filas = [];
+                foreach ($doc['turnos'] as $dia => $codigo) {
+                    $fecha   = Carbon::create($anio, $mes, $dia);
+                    $dow     = $fecha->dayOfWeek;       // 0=Dom..6=Sáb
+                    $idx     = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
+                    $horas   = $horasMap[$codigo] ?? 0;
+                    $esFinde = in_array($dow, [0, 6]);
+                    $diaNom  = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'][$idx];
+
+                    $filas[] = [
+                        'archivo_id'      => $archivo->id,
+                        'medico_id'       => $medico->id,
+                        'uci_id'          => $uci->id,
+                        'fecha'           => $fecha->toDateString(),
+                        'dia_numero'      => $dia,
+                        'dia_semana'      => $diaNom,
+                        'codigo_turno'    => $codigo,
+                        'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
+                        'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                        'horas_total'     => $horas,
+                        'es_fin_semana'   => $esFinde,
+                        'es_domingo'      => ($dow === 0),
+                        'estado_turno'    => 'programado',
+                        'fue_laborado'    => true,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ];
+                }
+
+                if ($filas) {
+                    TurnoMedico::insert($filas);
+                    $totalTurnos += count($filas);
+                }
+            }
+
+            $archivo->update([
+                'procesado'     => true,
+                'total_medicos' => count($parsed['doctores']),
+                'total_turnos'  => $totalTurnos,
+            ]);
+        });
+
+        $mesesNombres = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                         'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        return back()
+            ->with('tab_activo', 'calendario')
+            ->with('success_cal', "Importados {$totalTurnos} turnos para {$uci->nombre} — {$mesesNombres[$mes]} {$anio} (" . count($parsed['doctores']) . " médicos).");
+    }
+
+    // ── Parser: calendario mensual directo ───────────────────────
+
+    private function parseCalendarioMensual(
+        \Illuminate\Http\UploadedFile $file,
+        int $mes,
+        int $anio,
+        int $diasEnMes
+    ): array {
+        $spreadsheet = IOFactory::load($file->getPathname());
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        $maxRow = $sheet->getHighestDataRow();
+        $maxCol = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+
+        $codigosValidos = ['M','T','MT','N','MTN','MN','VAC','PER','INC','LIBRE'];
+
+        // ── Detectar fila de encabezado de días y columna de nombres ──
+        // Buscamos una fila que tenga números 1…N secuenciales
+        $headerRow  = null;
+        $nombreCol  = 1;
+        $colDiaMap  = []; // col_index => dia_numero (1..31)
+
+        for ($row = 1; $row <= min($maxRow, 10); $row++) {
+            $numerosEncontrados = [];
+            for ($col = 1; $col <= min($maxCol, 40); $col++) {
+                $v = $sheet->getCell([$col, $row])->getValue();
+                if (is_numeric($v) && (int)$v >= 1 && (int)$v <= 31) {
+                    $numerosEncontrados[$col] = (int)$v;
+                }
+            }
+            // Si hay ≥5 números que van del 1 al diasEnMes, es la fila de encabezado
+            if (count($numerosEncontrados) >= 5) {
+                $vals = array_values($numerosEncontrados);
+                if (min($vals) <= 5 && max($vals) >= min(20, $diasEnMes)) {
+                    $headerRow = $row;
+                    $colDiaMap = $numerosEncontrados;
+                    // Columna de nombres = la columna anterior al primer número
+                    $primeraCol = array_key_first($numerosEncontrados);
+                    $nombreCol  = max(1, $primeraCol - 1);
+                    break;
+                }
+            }
+        }
+
+        // Sin encabezado numérico: asumir col A = nombres, col B en adelante = días 1…N
+        if (!$colDiaMap) {
+            $nombreCol = 1;
+            for ($d = 1; $d <= $diasEnMes; $d++) {
+                $colDiaMap[$d + 1] = $d; // col 2 = día 1, col 3 = día 2, …
+            }
+        }
+
+        // ── Parsear médicos ──
+        $startRow = $headerRow ? $headerRow + 1 : 1;
+        $doctores = [];
+
+        for ($row = $startRow; $row <= $maxRow; $row++) {
+            $nombre = trim((string)$sheet->getCell([$nombreCol, $row])->getValue());
+            if (empty($nombre)) continue;
+            if (is_numeric($nombre)) continue; // fila de totales
+            if (in_array(strtoupper($nombre), ['MÉDICO','MEDICO','NOMBRE','TOTAL','SUMA'])) continue;
+
+            $turnos = []; // dia_numero => codigo
+            foreach ($colDiaMap as $col => $dia) {
+                if ($dia < 1 || $dia > $diasEnMes) continue;
+                $raw    = strtoupper(trim((string)$sheet->getCell([$col, $row])->getValue()));
+                $codigo = in_array($raw, $codigosValidos) ? $raw : '';
+                $turnos[$dia] = $codigo;
+            }
+
+            // Solo guardar si el médico tiene al menos un turno
+            $conTurno = array_filter($turnos, fn($c) => $c !== '');
+            if (empty($conTurno)) continue;
+
+            $doctores[] = [
+                'nombre' => $nombre,
+                'turnos' => $turnos,
+            ];
+        }
+
+        return ['doctores' => $doctores];
+    }
+
     // ── Parser Excel ─────────────────────────────────────────────
 
     private function parseExcelSecuencia(\Illuminate\Http\UploadedFile $file): array
