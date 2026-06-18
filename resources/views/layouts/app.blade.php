@@ -31,7 +31,7 @@
         /* ── SIDEBAR ── */
         #sidebar {
             width: var(--sidebar-width);
-            min-height: 100vh;
+            height: 100vh;
             background: var(--sidebar-bg);
             position: fixed;
             top: 0; left: 0;
@@ -39,6 +39,7 @@
             transition: width .25s ease;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
             box-shadow: 3px 0 15px rgba(0,0,0,.2);
         }
 

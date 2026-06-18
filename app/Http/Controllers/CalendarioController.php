@@ -58,15 +58,18 @@ class CalendarioController extends Controller
         }
 
         // Navegación mes anterior / siguiente
-        $mesAnterior = $mesAnteriorArchivo = null;
-        $mesSiguiente = $mesSiguienteArchivo = null;
+        $mesAnteriorArchivo = null;
+        $mesSiguienteArchivo = null;
         if ($archivo) {
-            $mesAnteriorArchivo = $archivos->first(function ($a) use ($archivo) {
-                return ($a->anio * 12 + $a->mes) < ($archivo->anio * 12 + $archivo->mes);
-            });
-            $mesSiguienteArchivo = $archivos->first(function ($a) use ($archivo) {
-                return ($a->anio * 12 + $a->mes) > ($archivo->anio * 12 + $archivo->mes);
-            });
+            $current = $archivo->anio * 12 + $archivo->mes;
+            $mesAnteriorArchivo = $archivos
+                ->filter(fn($a) => ($a->anio * 12 + $a->mes) < $current)
+                ->sortByDesc(fn($a) => $a->anio * 12 + $a->mes)
+                ->first();
+            $mesSiguienteArchivo = $archivos
+                ->filter(fn($a) => ($a->anio * 12 + $a->mes) > $current)
+                ->sortBy(fn($a) => $a->anio * 12 + $a->mes)
+                ->first();
         }
 
         return view('calendario.index', compact(
