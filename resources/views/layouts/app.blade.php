@@ -238,29 +238,59 @@
     </div>
 
     <div class="sidebar-nav">
-        <div class="sidebar-section">Principal</div>
-        <a class="nav-link {{ request()->routeIs('dashboard.*') ? 'active' : '' }}" href="{{ route('dashboard.index') }}">
-            <i class="bi bi-speedometer2"></i> Dashboard
-        </a>
-        <a class="nav-link {{ request()->routeIs('calendario.*') ? 'active' : '' }}" href="{{ route('calendario.index') }}">
-            <i class="bi bi-calendar-month"></i> Calendario Visual
+        @auth
+        @php $user = auth()->user(); @endphp
+
+        @if($user->esMedico())
+        {{-- ── MENÚ MÉDICO ───────────────────────────── --}}
+        @php
+            $pendientesMedico = 0;
+            if ($user->medico_id) {
+                $pendientesMedico = \App\Models\SolicitudCambioTurno::where('medico_receptor_id', $user->medico_id)
+                    ->whereIn('estado',['pendiente','enviado_a_receptor'])->count();
+            }
+        @endphp
+        <div class="sidebar-section">Mi Portal</div>
+        <a class="nav-link {{ request()->routeIs('medico.*') ? 'active' : '' }}" href="{{ route('medico.portal') }}">
+            <i class="bi bi-person-circle"></i> Mis Turnos
+            @if($pendientesMedico > 0)
+                <span class="nav-badge">{{ $pendientesMedico }}</span>
+            @endif
         </a>
         <a class="nav-link {{ request()->routeIs('turno-ahora.*') ? 'active' : '' }}" href="{{ route('turno-ahora.index') }}">
             <i class="bi bi-activity"></i> De Turno Ahora
         </a>
 
-        <div class="sidebar-section">Cuadros de Turno</div>
+        @else
+        {{-- ── MENÚ MAESTRO ──────────────────────────── --}}
+        @php
+            $alertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
+            $cambiosPendientes= \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+        @endphp
+
+        <div class="sidebar-section">Principal</div>
+        <a class="nav-link {{ request()->routeIs('dashboard.*') ? 'active' : '' }}" href="{{ route('dashboard.index') }}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
+        <a class="nav-link {{ request()->routeIs('turno-ahora.*') ? 'active' : '' }}" href="{{ route('turno-ahora.index') }}">
+            <i class="bi bi-activity"></i> De Turno Ahora
+        </a>
+        <a class="nav-link {{ request()->routeIs('calendario.*') ? 'active' : '' }}" href="{{ route('calendario.index') }}">
+            <i class="bi bi-calendar-month"></i> Calendario Visual
+        </a>
+
+        <div class="sidebar-section">Cuadro de Turnos</div>
         <a class="nav-link {{ request()->routeIs('archivos.*') ? 'active' : '' }}" href="{{ route('archivos.index') }}">
             <i class="bi bi-cloud-upload"></i> Importar Excel
         </a>
-        <a class="nav-link {{ request()->routeIs('formato-inicial.*') ? 'active' : '' }}" href="{{ route('formato-inicial.index') }}">
-            <i class="bi bi-layout-text-sidebar"></i> Formato Inicial
+        <a class="nav-link {{ request()->routeIs('secuencias.*') ? 'active' : '' }}" href="{{ route('secuencias.index') }}">
+            <i class="bi bi-calendar-week"></i> Secuencias UCI
+        </a>
+        <a class="nav-link {{ request()->routeIs('turno-editor.*') ? 'active' : '' }}" href="{{ route('turno-editor.index') }}">
+            <i class="bi bi-pencil-square"></i> Editor de Turnos
         </a>
         <a class="nav-link {{ request()->routeIs('planificacion.*') ? 'active' : '' }}" href="{{ route('planificacion.index') }}">
-            <i class="bi bi-pencil-square"></i> Editar Planificación
-        </a>
-        <a class="nav-link {{ request()->routeIs('semanas-molde.*') ? 'active' : '' }}" href="{{ route('semanas-molde.index') }}">
-            <i class="bi bi-layout-wtf"></i> Semanas Molde
+            <i class="bi bi-table"></i> Editar Planificación
         </a>
 
         <div class="sidebar-section">Personal</div>
@@ -270,20 +300,30 @@
         <a class="nav-link {{ request()->routeIs('ucis.*') ? 'active' : '' }}" href="{{ route('ucis.index') }}">
             <i class="bi bi-building-fill-cross"></i> UCIs
         </a>
-        <a class="nav-link {{ request()->routeIs('ausencias.*') ? 'active' : '' }}" href="{{ route('ausencias.index') }}">
-            <i class="bi bi-calendar-x"></i> Ausencias / Vacaciones
+
+        <div class="sidebar-section">Gestión</div>
+        <a class="nav-link {{ request()->routeIs('novedades.*') ? 'active' : '' }}" href="{{ route('novedades.index') }}">
+            <i class="bi bi-clipboard2-pulse"></i> Novedades
         </a>
         <a class="nav-link {{ request()->routeIs('cambios-turno.*') ? 'active' : '' }}" href="{{ route('cambios-turno.index') }}">
             <i class="bi bi-arrow-left-right"></i> Cambios de Turno
+            @if($cambiosPendientes > 0)
+                <span class="nav-badge">{{ $cambiosPendientes }}</span>
+            @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('ausencias.*') ? 'active' : '' }}" href="{{ route('ausencias.index') }}">
+            <i class="bi bi-calendar-x"></i> Ausencias / Permisos
         </a>
 
         <div class="sidebar-section">Control</div>
-        @php $alertasAbiertas = \App\Models\AlertaTurno::where('estado','abierta')->count(); @endphp
         <a class="nav-link {{ request()->routeIs('alertas.*') ? 'active' : '' }}" href="{{ route('alertas.index') }}">
             <i class="bi bi-exclamation-triangle"></i> Alertas
             @if($alertasAbiertas > 0)
                 <span class="nav-badge">{{ $alertasAbiertas }}</span>
             @endif
+        </a>
+        <a class="nav-link {{ request()->routeIs('consolidado.*') ? 'active' : '' }}" href="{{ route('consolidado.index') }}">
+            <i class="bi bi-bar-chart-line"></i> Consolidado / Excel
         </a>
         <a class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}" href="{{ route('reportes.index') }}">
             <i class="bi bi-file-earmark-bar-graph"></i> Reportes
@@ -291,10 +331,8 @@
         <a class="nav-link {{ request()->routeIs('configuracion.*') ? 'active' : '' }}" href="{{ route('configuracion.index') }}">
             <i class="bi bi-gear"></i> Configuración
         </a>
-        @auth
-        @if(auth()->user()->esMaster())
         <a class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}" href="{{ route('usuarios.index') }}">
-            <i class="bi bi-people"></i> Usuarios
+            <i class="bi bi-people"></i> Usuarios Médicos
         </a>
         @endif
         @endauth
@@ -310,7 +348,7 @@
                 <div style="color:#f1f5f9;font-size:11px;font-weight:600">{{ auth()->user()->name }}</div>
                 <div style="color:#94a3b8;font-size:10px">
                     @php $r=auth()->user()->rol; @endphp
-                    {{ $r==='master'?'Master':($r==='coordinador'?'Coordinador':'Visualizador') }}
+                    {{ $r==='master'?'Maestro':($r==='medico'?'Médico':'Visualizador') }}
                 </div>
             </div>
         </div>
@@ -347,11 +385,11 @@
             @auth
             @if(auth()->user()->esMaster())
             <span class="badge bg-danger-subtle text-danger rounded-pill">
-                <i class="bi bi-shield-fill-check me-1"></i>Master
+                <i class="bi bi-shield-fill-check me-1"></i>Maestro
             </span>
-            @elseif(auth()->user()->esCoordinador())
-            <span class="badge bg-warning-subtle text-warning rounded-pill">
-                <i class="bi bi-person-badge me-1"></i>Coordinador
+            @elseif(auth()->user()->esMedico())
+            <span class="badge bg-success-subtle text-success rounded-pill">
+                <i class="bi bi-person-heart me-1"></i>Médico
             </span>
             @else
             <span class="badge bg-secondary-subtle text-secondary rounded-pill">

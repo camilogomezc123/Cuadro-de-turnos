@@ -9,13 +9,13 @@ class AlertaTurno extends Model
     protected $table = 'alertas_turno';
 
     protected $fillable = [
-        'archivo_id', 'medico_id', 'uci_id', 'fecha',
-        'tipo', 'prioridad', 'mensaje', 'estado',
+        'archivo_id', 'medico_id', 'uci_id', 'fecha_turno',
+        'tipo', 'prioridad', 'mensaje', 'mensaje_medico', 'estado',
         'resuelta_por', 'resuelta_at', 'nota_resolucion',
     ];
 
     protected $casts = [
-        'fecha'       => 'date',
+        'fecha_turno' => 'date',
         'resuelta_at' => 'datetime',
     ];
 
@@ -36,6 +36,8 @@ class AlertaTurno extends Model
         'MTN_DIA_HABIL'            => 'MTN en día hábil (lunes a viernes)',
         'JORNADA_24H_HABIL'        => 'Jornada mayor a 24h en día hábil',
         'CODIGO_NO_PARAMETRIZADO'  => 'Código de turno no parametrizado (ej: MN)',
+        'EXCESO_200H'              => 'Exceso de 200 horas mensuales',
+        'EXCESO_12H_HABIL'         => 'Más de 12 horas en día hábil',
     ];
 
     public function medico()

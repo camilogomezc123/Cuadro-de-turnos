@@ -4,6 +4,7 @@ use App\Http\Controllers\ArchivoController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarioController;
 use App\Http\Controllers\ConfiguracionController;
+use App\Http\Controllers\ConsolidadoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeTurnoAhoraController;
 use App\Http\Controllers\AlertaController;
@@ -11,10 +12,14 @@ use App\Http\Controllers\AusenciaController;
 use App\Http\Controllers\CambioTurnoController;
 use App\Http\Controllers\FormatoInicialController;
 use App\Http\Controllers\MedicoController;
+use App\Http\Controllers\NovedadController;
 use App\Http\Controllers\PlanificacionController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\SemanaMoldeController;
+use App\Http\Controllers\SecuenciaUciController;
+use App\Http\Controllers\TurnoEditorController;
 use App\Http\Controllers\UciController;
+use App\Http\Controllers\MedicoPortalController;
 use Illuminate\Support\Facades\Route;
 
 // ── Autenticación (públicas) ────────────────────────────────────
@@ -22,106 +27,127 @@ Route::get('/login',  [AuthController::class, 'loginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout',[AuthController::class, 'logout'])->name('logout');
 
-// ── Rutas protegidas (requieren login) ─────────────────────────
+// ── Portal médico ───────────────────────────────────────────────
+Route::middleware('auth')->prefix('mi-portal')->name('medico.')->group(function () {
+    Route::get('/',                                        [MedicoPortalController::class, 'portal'])        ->name('portal');
+    Route::post('/ofrecer-turno',                          [MedicoPortalController::class, 'ofrecerTurno'])  ->name('ofrecer-turno');
+    Route::post('/aceptar-oferta/{solicitud}',             [MedicoPortalController::class, 'aceptarOferta']) ->name('aceptar-oferta');
+    Route::post('/solicitar-cambio',                       [MedicoPortalController::class, 'solicitarCambio'])->name('solicitar-cambio');
+    Route::patch('/responder-cambio/{solicitud}',          [MedicoPortalController::class, 'responderCambio'])->name('responder-cambio');
+    Route::delete('/cancelar-cambio/{solicitud}',          [MedicoPortalController::class, 'cancelarCambio'])->name('cancelar-cambio');
+    Route::get('/turnos-medico',                           [MedicoPortalController::class, 'turnosMedico'])  ->name('turnos-api');
+});
+
+// ── Rutas protegidas ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
 
     Route::redirect('/', '/dashboard');
 
-    // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
-    // Calendario visual (vista amigable mes/UCI)
     Route::get('/calendario', [CalendarioController::class, 'index'])->name('calendario.index');
     Route::post('/calendario/descargar', [CalendarioController::class, 'descargarExcel'])->name('calendario.descargar');
 
-    // Archivos / Importación — solo master puede subir/borrar
-    Route::get('/archivos', [ArchivoController::class, 'index'])->name('archivos.index');
-    Route::post('/archivos/upload', [ArchivoController::class, 'upload'])
-        ->middleware('master')->name('archivos.upload');
-    Route::delete('/archivos/{archivo}', [ArchivoController::class, 'destroy'])
-        ->middleware('master')->name('archivos.destroy');
-
-    // Planificación mensual — editar solo master
-    Route::get('/planificacion', [PlanificacionController::class, 'index'])->name('planificacion.index');
-    Route::post('/planificacion/editar', [PlanificacionController::class, 'editarCelda'])
-        ->middleware('master')->name('planificacion.editar');
-    Route::get('/planificacion/resumen-medico', [PlanificacionController::class, 'resumenMedico'])
-        ->name('planificacion.resumen-medico');
-
-    // Formato inicial + repetir secuencia — solo master
-    Route::get('/formato-inicial', [FormatoInicialController::class, 'index'])->name('formato-inicial.index');
-    Route::post('/formato-inicial/excel', [FormatoInicialController::class, 'cargarExcel'])
-        ->middleware('master')->name('formato-inicial.excel');
-    Route::post('/formato-inicial/manual', [FormatoInicialController::class, 'guardarManual'])
-        ->middleware('master')->name('formato-inicial.manual');
-    Route::post('/formato-inicial/repetir', [FormatoInicialController::class, 'repetirAnio'])
-        ->middleware('master')->name('formato-inicial.repetir');
-    Route::delete('/formato-inicial/{plantilla}', [FormatoInicialController::class, 'destroyPlantilla'])
-        ->middleware('master')->name('formato-inicial.destroy');
-
-    // De turno ahora
     Route::get('/de-turno-ahora', [DeTurnoAhoraController::class, 'index'])->name('turno-ahora.index');
 
-    // Médicos
-    Route::get('/medicos', [MedicoController::class, 'index'])->name('medicos.index');
-    Route::get('/medicos/{medico}', [MedicoController::class, 'show'])->name('medicos.show');
+    Route::get('/ucis',       [UciController::class, 'index'])->name('ucis.index');
+    Route::get('/ucis/{uci}', [UciController::class, 'show']) ->name('ucis.show');
 
-    // UCIs
-    Route::get('/ucis', [UciController::class, 'index'])->name('ucis.index');
-    Route::get('/ucis/{uci}', [UciController::class, 'show'])->name('ucis.show');
+    // ── Solo maestro ──────────────────────────────────────────────
+    Route::middleware('master')->group(function () {
 
-    // Semanas molde — solo master
-    Route::resource('semanas-molde', SemanaMoldeController::class)->names('semanas-molde')
-        ->middleware('master');
-    Route::post('/semanas-molde/{semanaMolde}/aplicar', [SemanaMoldeController::class, 'aplicar'])
-        ->middleware('master')->name('semanas-molde.aplicar');
+        // Archivos
+        Route::get('/archivos',            [ArchivoController::class, 'index'])  ->name('archivos.index');
+        Route::post('/archivos/upload',    [ArchivoController::class, 'upload']) ->name('archivos.upload');
+        Route::delete('/archivos/{archivo}',[ArchivoController::class,'destroy'])->name('archivos.destroy');
 
-    // Ausencias
-    Route::resource('ausencias', AusenciaController::class)->names('ausencias');
-    Route::patch('/ausencias/{ausencia}/aprobar', [AusenciaController::class, 'aprobar'])
-        ->middleware('master')->name('ausencias.aprobar');
-    Route::patch('/ausencias/{ausencia}/rechazar', [AusenciaController::class, 'rechazar'])
-        ->middleware('master')->name('ausencias.rechazar');
+        // Planificación
+        Route::get('/planificacion',              [PlanificacionController::class, 'index'])       ->name('planificacion.index');
+        Route::post('/planificacion/editar',      [PlanificacionController::class, 'editarCelda']) ->name('planificacion.editar');
+        Route::get('/planificacion/resumen-medico',[PlanificacionController::class,'resumenMedico'])->name('planificacion.resumen-medico');
 
-    // Cambios de turno
-    Route::resource('cambios-turno', CambioTurnoController::class)->names('cambios-turno');
-    Route::patch('/cambios-turno/{cambio}/aceptar', [CambioTurnoController::class, 'aceptar'])
-        ->name('cambios-turno.aceptar');
-    Route::patch('/cambios-turno/{cambio}/rechazar-colega', [CambioTurnoController::class, 'rechazarColega'])
-        ->name('cambios-turno.rechazar-colega');
-    Route::patch('/cambios-turno/{cambio}/aprobar', [CambioTurnoController::class, 'aprobar'])
-        ->middleware('master')->name('cambios-turno.aprobar');
-    Route::patch('/cambios-turno/{cambio}/rechazar', [CambioTurnoController::class, 'rechazar'])
-        ->middleware('master')->name('cambios-turno.rechazar');
+        // Editor de turnos
+        Route::get('/turnos/editor',                        [TurnoEditorController::class, 'index'])           ->name('turno-editor.index');
+        Route::post('/turnos/editor/secuencia',             [TurnoEditorController::class, 'guardarSecuencia'])->name('turno-editor.guardar-secuencia');
+        Route::post('/turnos/editor/repetir',               [TurnoEditorController::class, 'repetirSecuencia'])->name('turno-editor.repetir');
+        Route::post('/turnos/editor/agregar-medico',        [TurnoEditorController::class, 'agregarMedico'])   ->name('turno-editor.agregar-medico');
+        Route::post('/turnos/editor/sustituir',             [TurnoEditorController::class, 'sustituir'])       ->name('turno-editor.sustituir');
+        Route::post('/turnos/editor/aprobar-cambio/{sol}',  [TurnoEditorController::class, 'aprobarCambio'])   ->name('turno-editor.aprobar-cambio');
 
-    // Alertas
-    Route::get('/alertas', [AlertaController::class, 'index'])->name('alertas.index');
-    Route::patch('/alertas/{alerta}/estado', [AlertaController::class, 'cambiarEstado'])
-        ->middleware('master')->name('alertas.estado');
-    Route::delete('/alertas/{alerta}', [AlertaController::class, 'destroy'])
-        ->middleware('master')->name('alertas.destroy');
-    Route::post('/alertas/ejecutar/{archivoId}', [AlertaController::class, 'ejecutarValidacion'])
-        ->middleware('master')->name('alertas.ejecutar');
+        // Secuencias UCI
+        Route::get('/secuencias',                              [SecuenciaUciController::class, 'index'])       ->name('secuencias.index');
+        Route::post('/secuencias',                             [SecuenciaUciController::class, 'store'])        ->name('secuencias.store');
+        Route::post('/secuencias/{secuencia}/aplicar-mes',    [SecuenciaUciController::class, 'aplicarMes'])   ->name('secuencias.aplicar-mes');
+        Route::post('/secuencias/{secuencia}/aplicar-anio',   [SecuenciaUciController::class, 'aplicarAnio'])  ->name('secuencias.aplicar-anio');
+        Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])->name('secuencias.agregar-medico');
+        Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])       ->name('secuencias.destroy');
 
-    // Reportes
-    Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
-    Route::post('/reportes/excel', [ReporteController::class, 'exportarExcel'])->name('reportes.excel');
-    Route::post('/reportes/pdf', [ReporteController::class, 'exportarPdf'])->name('reportes.pdf');
-    Route::post('/reportes/medico/excel', [ReporteController::class, 'exportarMedicoExcel'])->name('reportes.medico.excel');
-    Route::post('/reportes/medico/pdf', [ReporteController::class, 'exportarMedicoPdf'])->name('reportes.medico.pdf');
+        // Novedades
+        Route::get('/novedades',                          [NovedadController::class, 'index'])               ->name('novedades.index');
+        Route::post('/novedades',                         [NovedadController::class, 'store'])                ->name('novedades.store');
+        Route::post('/novedades/no-asistencia/{turno}',   [NovedadController::class, 'registrarNoAsistencia'])->name('novedades.no-asistencia');
+        Route::patch('/novedades/{novedad}',              [NovedadController::class, 'update'])               ->name('novedades.update');
+        Route::delete('/novedades/{novedad}',             [NovedadController::class, 'destroy'])              ->name('novedades.destroy');
 
-    // Configuración — solo master
-    Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
-    Route::put('/configuracion/cobertura/{uci}', [ConfiguracionController::class, 'actualizarCobertura'])
-        ->middleware('master')->name('configuracion.cobertura');
+        // Consolidado / Excel
+        Route::get('/consolidado',              [ConsolidadoController::class, 'index'])              ->name('consolidado.index');
+        Route::get('/consolidado/excel',        [ConsolidadoController::class, 'descargarConsolidado'])->name('consolidado.excel');
+        Route::get('/consolidado/cuadro-excel', [ConsolidadoController::class, 'descargarCuadro'])    ->name('consolidado.cuadro-excel');
 
-    // Usuarios — solo master
-    Route::get('/usuarios', [AuthController::class, 'usuarios'])
-        ->middleware('master')->name('usuarios.index');
-    Route::post('/usuarios', [AuthController::class, 'crearUsuario'])
-        ->middleware('master')->name('usuarios.crear');
-    Route::delete('/usuarios/{usuario}', [AuthController::class, 'eliminarUsuario'])
-        ->middleware('master')->name('usuarios.eliminar');
-    Route::patch('/usuarios/{usuario}/password', [AuthController::class, 'cambiarPassword'])
-        ->middleware('master')->name('usuarios.password');
+        // Aprobar/rechazar cambios (maestro)
+        Route::post('/cambios/aprobar/{solicitud}',  [MedicoPortalController::class, 'aprobarCambio']) ->name('cambios.aprobar');
+        Route::post('/cambios/rechazar/{solicitud}', [MedicoPortalController::class, 'rechazarCambio'])->name('cambios.rechazar');
+
+        // Formato inicial
+        Route::get('/formato-inicial',             [FormatoInicialController::class, 'index'])         ->name('formato-inicial.index');
+        Route::post('/formato-inicial/excel',      [FormatoInicialController::class, 'cargarExcel'])   ->name('formato-inicial.excel');
+        Route::post('/formato-inicial/manual',     [FormatoInicialController::class, 'guardarManual']) ->name('formato-inicial.manual');
+        Route::post('/formato-inicial/repetir',    [FormatoInicialController::class, 'repetirAnio'])   ->name('formato-inicial.repetir');
+        Route::delete('/formato-inicial/{plantilla}',[FormatoInicialController::class,'destroyPlantilla'])->name('formato-inicial.destroy');
+
+        // Semanas molde
+        Route::resource('semanas-molde', SemanaMoldeController::class)->names('semanas-molde');
+        Route::post('/semanas-molde/{semanaMolde}/aplicar', [SemanaMoldeController::class, 'aplicar'])->name('semanas-molde.aplicar');
+
+        // Ausencias
+        Route::resource('ausencias', AusenciaController::class)->names('ausencias');
+        Route::patch('/ausencias/{ausencia}/aprobar', [AusenciaController::class, 'aprobar'])->name('ausencias.aprobar');
+        Route::patch('/ausencias/{ausencia}/rechazar',[AusenciaController::class, 'rechazar'])->name('ausencias.rechazar');
+
+        // Cambios de turno (vista maestro heredada)
+        Route::resource('cambios-turno', CambioTurnoController::class)->names('cambios-turno');
+        Route::patch('/cambios-turno/{cambio}/aceptar',        [CambioTurnoController::class, 'aceptar'])       ->name('cambios-turno.aceptar');
+        Route::patch('/cambios-turno/{cambio}/rechazar-colega',[CambioTurnoController::class, 'rechazarColega'])->name('cambios-turno.rechazar-colega');
+        Route::patch('/cambios-turno/{cambio}/aprobar',        [CambioTurnoController::class, 'aprobar'])        ->name('cambios-turno.aprobar');
+        Route::patch('/cambios-turno/{cambio}/rechazar',       [CambioTurnoController::class, 'rechazar'])       ->name('cambios-turno.rechazar');
+
+        // Alertas
+        Route::get('/alertas', [AlertaController::class, 'index'])->name('alertas.index');
+        Route::patch('/alertas/{alerta}/estado', [AlertaController::class, 'cambiarEstado'])->name('alertas.estado');
+        Route::delete('/alertas/{alerta}',       [AlertaController::class, 'destroy'])      ->name('alertas.destroy');
+        Route::post('/alertas/ejecutar/{archivoId}', [AlertaController::class, 'ejecutarValidacion'])->name('alertas.ejecutar');
+
+        // Reportes
+        Route::get('/reportes',                  [ReporteController::class, 'index'])           ->name('reportes.index');
+        Route::post('/reportes/excel',           [ReporteController::class, 'exportarExcel'])   ->name('reportes.excel');
+        Route::post('/reportes/pdf',             [ReporteController::class, 'exportarPdf'])     ->name('reportes.pdf');
+        Route::post('/reportes/medico/excel',    [ReporteController::class, 'exportarMedicoExcel'])->name('reportes.medico.excel');
+        Route::post('/reportes/medico/pdf',      [ReporteController::class, 'exportarMedicoPdf'])  ->name('reportes.medico.pdf');
+
+        // Configuración
+        Route::get('/configuracion', [ConfiguracionController::class, 'index'])->name('configuracion.index');
+        Route::put('/configuracion/cobertura/{uci}', [ConfiguracionController::class, 'actualizarCobertura'])->name('configuracion.cobertura');
+
+        // Médicos (maestro)
+        Route::get('/medicos',         [MedicoController::class, 'index'])->name('medicos.index');
+        Route::get('/medicos/{medico}',[MedicoController::class, 'show']) ->name('medicos.show');
+
+        // Usuarios
+        Route::get('/usuarios',                       [AuthController::class, 'usuarios'])           ->name('usuarios.index');
+        Route::post('/usuarios',                      [AuthController::class, 'crearUsuario'])        ->name('usuarios.crear');
+        Route::post('/usuarios/medicos-masivo',       [AuthController::class, 'crearUsuariosMedicos'])->name('usuarios.medicos-masivo');
+        Route::delete('/usuarios/{usuario}',          [AuthController::class, 'eliminarUsuario'])     ->name('usuarios.eliminar');
+        Route::patch('/usuarios/{usuario}/password',  [AuthController::class, 'cambiarPassword'])     ->name('usuarios.password');
+        Route::patch('/usuarios/{usuario}/toggle',    [AuthController::class, 'toggleUsuario'])       ->name('usuarios.toggle');
+    });
 });
