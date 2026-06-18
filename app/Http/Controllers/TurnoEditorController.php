@@ -364,16 +364,80 @@ class TurnoEditorController extends Controller
 
     public function sustituir(Request $request)
     {
+        // Modo 1: edición de celda desde la grilla (medico_id + fecha + uci_id + archivo_id)
+        if ($request->has('medico_id') && $request->has('fecha')) {
+            $request->validate([
+                'medico_id'   => 'required|exists:medicos,id',
+                'fecha'       => 'required|date',
+                'uci_id'      => 'required|exists:ucis,id',
+                'archivo_id'  => 'nullable|exists:archivos_cargados,id',
+                'codigo_nuevo'=> 'nullable|string|max:10',
+            ]);
+
+            $codigo = strtoupper(trim($request->codigo_nuevo ?? ''));
+            if (!array_key_exists($codigo, self::HORAS_MAP)) $codigo = '';
+            $horas  = self::HORAS_MAP[$codigo] ?? 0;
+            $fecha  = \Carbon\Carbon::parse($request->fecha);
+            $dow    = $fecha->dayOfWeek;
+            $idx    = ($dow === 0) ? 6 : $dow - 1;
+
+            $turno = TurnoMedico::where('medico_id', $request->medico_id)
+                ->where('uci_id', $request->uci_id)
+                ->where('fecha', $request->fecha)
+                ->when($request->archivo_id, fn($q) => $q->where('archivo_id', $request->archivo_id))
+                ->first();
+
+            if ($turno) {
+                $turno->update([
+                    'codigo_turno'    => $codigo,
+                    'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
+                    'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                    'horas_total'     => $horas,
+                    'es_fin_semana'   => in_array($dow,[0,6]),
+                    'es_domingo'      => ($dow===0),
+                ]);
+                $archivo = $turno->archivo;
+            } else {
+                // Crear el registro si no existe
+                $archivoId = $request->archivo_id
+                    ?? ArchivoCargado::where('mes', $fecha->month)->where('anio', $fecha->year)->value('id');
+                if (!$archivoId) {
+                    return response()->json(['ok'=>false,'mensaje'=>'No existe archivo para este mes.']);
+                }
+                $archivo = ArchivoCargado::find($archivoId);
+                TurnoMedico::create([
+                    'archivo_id'      => $archivoId,
+                    'medico_id'       => $request->medico_id,
+                    'uci_id'          => $request->uci_id,
+                    'fecha'           => $request->fecha,
+                    'dia_numero'      => $fecha->day,
+                    'dia_semana'      => $this->nombreDiaSemana($idx),
+                    'codigo_turno'    => $codigo,
+                    'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
+                    'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                    'horas_total'     => $horas,
+                    'es_fin_semana'   => in_array($dow,[0,6]),
+                    'es_domingo'      => ($dow===0),
+                ]);
+            }
+
+            if ($archivo) {
+                $this->recalcularArchivo($archivo, $archivo->mes, $archivo->anio);
+            }
+
+            return response()->json(['ok' => true, 'mensaje' => 'Turno actualizado.']);
+        }
+
+        // Modo 2: sustitución clásica por turno_id
         $request->validate([
-            'turno_id'         => 'required|exists:turno_medicos,id',
-            'medico_nuevo_id'  => 'nullable|exists:medicos,id',
-            'nombre_nuevo'     => 'nullable|string|max:100',
-            'codigo_nuevo'     => 'nullable|string|max:10',
+            'turno_id'        => 'required|exists:turno_medicos,id',
+            'medico_nuevo_id' => 'nullable|exists:medicos,id',
+            'nombre_nuevo'    => 'nullable|string|max:100',
+            'codigo_nuevo'    => 'nullable|string|max:10',
         ]);
 
         $turno = TurnoMedico::findOrFail($request->turno_id);
 
-        // Determinar médico que cubre
         $medicoNuevoId = $request->medico_nuevo_id;
         if (!$medicoNuevoId && $request->nombre_nuevo) {
             $mNuevo        = Medico::firstOrCreate(['nombre' => trim($request->nombre_nuevo)], ['uci_id'=>$turno->uci_id,'activo'=>true]);
@@ -384,42 +448,23 @@ class TurnoEditorController extends Controller
         $horas       = self::HORAS_MAP[$codigoNuevo] ?? 0;
 
         DB::transaction(function () use ($turno, $medicoNuevoId, $codigoNuevo, $horas) {
-            // Si hay médico nuevo: crear su turno en la misma fecha/UCI
             if ($medicoNuevoId) {
                 TurnoMedico::updateOrCreate(
+                    ['archivo_id'=>$turno->archivo_id,'medico_id'=>$medicoNuevoId,'uci_id'=>$turno->uci_id,'fecha'=>$turno->fecha],
                     [
-                        'archivo_id' => $turno->archivo_id,
-                        'medico_id'  => $medicoNuevoId,
-                        'uci_id'     => $turno->uci_id,
-                        'fecha'      => $turno->fecha,
-                    ],
-                    [
-                        'dia_numero'      => $turno->dia_numero,
-                        'dia_semana'      => $turno->dia_semana,
-                        'codigo_turno'    => $codigoNuevo,
-                        'horas_diurnas'   => in_array($codigoNuevo,['M','T','MT','MTN'])?min($horas,12):0,
-                        'horas_nocturnas' => in_array($codigoNuevo,['N','MTN','MN'])?12:0,
-                        'horas_total'     => $horas,
-                        'es_fin_semana'   => $turno->es_fin_semana,
-                        'es_domingo'      => $turno->es_domingo,
+                        'dia_numero'=>$turno->dia_numero,'dia_semana'=>$turno->dia_semana,
+                        'codigo_turno'=>$codigoNuevo,
+                        'horas_diurnas'=>in_array($codigoNuevo,['M','T','MT','MTN'])?min($horas,12):0,
+                        'horas_nocturnas'=>in_array($codigoNuevo,['N','MTN','MN'])?12:0,
+                        'horas_total'=>$horas,
+                        'es_fin_semana'=>$turno->es_fin_semana,'es_domingo'=>$turno->es_domingo,
                     ]
                 );
             }
+            $turno->update(['codigo_turno'=>'','horas_diurnas'=>0,'horas_nocturnas'=>0,'horas_total'=>0]);
 
-            // Vaciar el turno del médico original (no eliminar, dejar registro)
-            $turno->update([
-                'codigo_turno'    => '',
-                'horas_diurnas'   => 0,
-                'horas_nocturnas' => 0,
-                'horas_total'     => 0,
-                'observacion'     => 'Sustituido por médico ' . $medicoNuevoId,
-            ]);
-
-            // Recalcular
             $archivo = $turno->archivo;
-            if ($archivo) {
-                $this->recalcularArchivo($archivo, $archivo->mes, $archivo->anio);
-            }
+            if ($archivo) $this->recalcularArchivo($archivo, $archivo->mes, $archivo->anio);
         });
 
         return response()->json(['ok' => true, 'mensaje' => 'Sustitución registrada.']);
