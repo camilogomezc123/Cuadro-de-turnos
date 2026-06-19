@@ -67,8 +67,9 @@ Route::middleware('auth')->group(function () {
     // ── Novedades y cambios: accesibles por operativo (ven solo las suyas) ──
     Route::get('/novedades',       [NovedadController::class, 'index'])->name('novedades.index');
     Route::post('/novedades',      [NovedadController::class, 'store'])->name('novedades.store');
-    Route::get('/cambios-turno',   [CambioTurnoController::class, 'index'])->name('cambios-turno.index');
-    Route::get('/cambios-turno/{cambioTurno}', [CambioTurnoController::class, 'show'])->name('cambios-turno.show');
+    Route::get('/cambios-turno',            [CambioTurnoController::class, 'index'])    ->name('cambios-turno.index');
+    Route::get('/cambios-turno/mis-turnos', [CambioTurnoController::class, 'misTurnos'])->name('cambios-turno.mis-turnos');
+    Route::get('/cambios-turno/{cambioTurno}', [CambioTurnoController::class, 'show']) ->name('cambios-turno.show');
 
     // Médico puede crear solicitud y responder como receptor (aceptar/rechazar)
     Route::post('/cambios-turno',                              [CambioTurnoController::class, 'store'])          ->name('cambios-turno.store');

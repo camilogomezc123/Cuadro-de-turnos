@@ -67,6 +67,33 @@ class CambioTurnoController extends Controller
         ));
     }
 
+    public function misTurnos(Request $request)
+    {
+        $user      = auth()->user();
+        $archivoId = (int)$request->archivo_id;
+
+        if (!$archivoId) {
+            return response()->json([]);
+        }
+
+        // Maestro sin medico_id: devuelve vacío (el maestro elige turno manualmente)
+        if (!$user->medico_id) {
+            return response()->json([]);
+        }
+
+        $turnos = TurnoMedico::where('medico_id', $user->medico_id)
+            ->where('archivo_id', $archivoId)
+            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->orderBy('fecha')
+            ->get(['id','fecha','codigo_turno','uci_id']);
+
+        return response()->json($turnos->map(fn($t) => [
+            'id'     => $t->id,
+            'label'  => \Carbon\Carbon::parse($t->fecha)->format('d/m') . ' · ' . $t->codigo_turno,
+            'fecha'  => \Carbon\Carbon::parse($t->fecha)->format('d/m/Y'),
+        ]));
+    }
+
     public function store(Request $request)
     {
         $user = auth()->user();
