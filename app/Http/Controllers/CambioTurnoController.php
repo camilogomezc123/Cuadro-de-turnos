@@ -69,6 +69,8 @@ class CambioTurnoController extends Controller
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+
         $data = $request->validate([
             'turno_origen_id'    => 'required|exists:turno_medicos,id',
             'medico_receptor_id' => 'required|exists:medicos,id',
@@ -77,12 +79,17 @@ class CambioTurnoController extends Controller
 
         $turnoOrigen = TurnoMedico::findOrFail($data['turno_origen_id']);
 
+        // Operativo solo puede solicitar cambio de sus propios turnos
+        if ($user->esMedico() && $user->medico_id && $turnoOrigen->medico_id !== $user->medico_id) {
+            return back()->with('error', 'Solo puedes solicitar cambios de tus propios turnos.');
+        }
+
         $solicitud = SolicitudCambioTurno::create([
-            'turno_origen_id'    => $turnoOrigen->id,
+            'turno_origen_id'       => $turnoOrigen->id,
             'medico_solicitante_id' => $turnoOrigen->medico_id,
-            'medico_receptor_id' => $data['medico_receptor_id'],
-            'motivo'             => $data['motivo'],
-            'estado'             => 'pendiente',
+            'medico_receptor_id'    => $data['medico_receptor_id'],
+            'motivo'                => $data['motivo'],
+            'estado'                => 'pendiente',
         ]);
 
         AuditoriaSistema::registrar('SOLICITAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $solicitud->id,
@@ -93,13 +100,24 @@ class CambioTurnoController extends Controller
 
     public function aceptar(Request $request, SolicitudCambioTurno $cambio)
     {
+        $user = auth()->user();
+
+        // Solo el médico receptor (o maestro) puede aceptar
+        if ($user->esMedico() && $user->medico_id && $cambio->medico_receptor_id !== $user->medico_id) {
+            return back()->with('error', 'Solo el médico receptor puede aceptar esta solicitud.');
+        }
+
+        if ($cambio->estado !== 'pendiente') {
+            return back()->with('error', 'Esta solicitud ya fue respondida.');
+        }
+
         $request->validate(['turno_destino_id' => 'nullable|exists:turno_medicos,id']);
 
         $cambio->update([
-            'estado'                 => 'aceptado_colega',
-            'turno_destino_id'       => $request->turno_destino_id,
-            'respuesta_colega'       => $request->respuesta ?? 'Aceptado',
-            'respondido_colega_at'   => now(),
+            'estado'               => 'aceptado_colega',
+            'turno_destino_id'     => $request->turno_destino_id,
+            'respuesta_colega'     => $request->respuesta ?? 'Aceptado',
+            'respondido_colega_at' => now(),
         ]);
         AuditoriaSistema::registrar('ACEPTAR_CAMBIO_COLEGA', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
         return back()->with('success', 'Cambio aceptado. Esperando aprobación del coordinador.');
@@ -107,13 +125,24 @@ class CambioTurnoController extends Controller
 
     public function rechazarColega(Request $request, SolicitudCambioTurno $cambio)
     {
+        $user = auth()->user();
+
+        // Solo el médico receptor (o maestro) puede rechazar
+        if ($user->esMedico() && $user->medico_id && $cambio->medico_receptor_id !== $user->medico_id) {
+            return back()->with('error', 'Solo el médico receptor puede rechazar esta solicitud.');
+        }
+
+        if ($cambio->estado !== 'pendiente') {
+            return back()->with('error', 'Esta solicitud ya fue respondida.');
+        }
+
         $cambio->update([
             'estado'               => 'rechazado_colega',
             'respuesta_colega'     => $request->motivo ?? 'Rechazado',
             'respondido_colega_at' => now(),
         ]);
         AuditoriaSistema::registrar('RECHAZAR_CAMBIO_COLEGA', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
-        return back()->with('success', 'Cambio rechazado por el colega.');
+        return back()->with('success', 'Cambio rechazado.');
     }
 
     public function aprobar(SolicitudCambioTurno $cambio)

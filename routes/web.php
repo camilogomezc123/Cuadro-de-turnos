@@ -70,6 +70,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/cambios-turno',   [CambioTurnoController::class, 'index'])->name('cambios-turno.index');
     Route::get('/cambios-turno/{cambioTurno}', [CambioTurnoController::class, 'show'])->name('cambios-turno.show');
 
+    // Médico puede crear solicitud y responder como receptor (aceptar/rechazar)
+    Route::post('/cambios-turno',                              [CambioTurnoController::class, 'store'])          ->name('cambios-turno.store');
+    Route::patch('/cambios-turno/{cambio}/aceptar',            [CambioTurnoController::class, 'aceptar'])        ->name('cambios-turno.aceptar');
+    Route::patch('/cambios-turno/{cambio}/rechazar-colega',    [CambioTurnoController::class, 'rechazarColega']) ->name('cambios-turno.rechazar-colega');
+
     // ── Solo maestro ──────────────────────────────────────────────
     Route::middleware('master')->group(function () {
 
@@ -135,12 +140,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('/ausencias/{ausencia}/aprobar', [AusenciaController::class, 'aprobar'])->name('ausencias.aprobar');
         Route::patch('/ausencias/{ausencia}/rechazar',[AusenciaController::class, 'rechazar'])->name('ausencias.rechazar');
 
-        // Cambios de turno: acciones solo maestro
-        Route::post('/cambios-turno', [CambioTurnoController::class, 'store'])->name('cambios-turno.store');
-        Route::patch('/cambios-turno/{cambio}/aceptar',        [CambioTurnoController::class, 'aceptar'])       ->name('cambios-turno.aceptar');
-        Route::patch('/cambios-turno/{cambio}/rechazar-colega',[CambioTurnoController::class, 'rechazarColega'])->name('cambios-turno.rechazar-colega');
-        Route::patch('/cambios-turno/{cambio}/aprobar',        [CambioTurnoController::class, 'aprobar'])        ->name('cambios-turno.aprobar');
-        Route::patch('/cambios-turno/{cambio}/rechazar',       [CambioTurnoController::class, 'rechazar'])       ->name('cambios-turno.rechazar');
+        // Cambios de turno: solo maestro puede aprobar o rechazar definitivamente
+        Route::patch('/cambios-turno/{cambio}/aprobar',  [CambioTurnoController::class, 'aprobar']) ->name('cambios-turno.aprobar');
+        Route::patch('/cambios-turno/{cambio}/rechazar', [CambioTurnoController::class, 'rechazar'])->name('cambios-turno.rechazar');
 
         // Alertas
         Route::get('/alertas', [AlertaController::class, 'index'])->name('alertas.index');
