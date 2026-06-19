@@ -60,28 +60,40 @@ class MedicoDuplicadoController extends Controller
             DB::table('burnout_alertas')->where('medico_id', $dId)->update(['medico_id' => $pId]);
 
             // 9. burnout_resultados — UNIQUE(medico_id, periodo_evaluado, encuesta_id)
-            // Borrar registros del duplicado que colisionan con registros ya existentes del primario
-            DB::table('burnout_resultados as br_dup')
-                ->where('br_dup.medico_id', $dId)
-                ->whereExists(fn($q) => $q->from('burnout_resultados as br_pri')
-                    ->where('br_pri.medico_id', $pId)
-                    ->whereColumn('br_pri.periodo_evaluado', 'br_dup.periodo_evaluado')
-                    ->whereColumn('br_pri.encuesta_id', 'br_dup.encuesta_id')
-                )
-                ->delete();
-            // Reasignar los que no colisionan
+            // MariaDB no soporta alias en DELETE, se resuelve en PHP
+            $clavesBurnoutPrimario = DB::table('burnout_resultados')
+                ->where('medico_id', $pId)
+                ->get(['periodo_evaluado', 'encuesta_id'])
+                ->map(fn($r) => $r->periodo_evaluado . '|' . $r->encuesta_id)
+                ->toArray();
+            if (!empty($clavesBurnoutPrimario)) {
+                $idsConflictoBurnout = DB::table('burnout_resultados')
+                    ->where('medico_id', $dId)
+                    ->get(['id', 'periodo_evaluado', 'encuesta_id'])
+                    ->filter(fn($r) => in_array($r->periodo_evaluado . '|' . $r->encuesta_id, $clavesBurnoutPrimario))
+                    ->pluck('id')->toArray();
+                if (!empty($idsConflictoBurnout)) {
+                    DB::table('burnout_resultados')->whereIn('id', $idsConflictoBurnout)->delete();
+                }
+            }
             DB::table('burnout_resultados')->where('medico_id', $dId)->update(['medico_id' => $pId]);
 
             // 10. indicador_medicos — UNIQUE(medico_id, uci_id, mes, anio)
-            DB::table('indicador_medicos as im_dup')
-                ->where('im_dup.medico_id', $dId)
-                ->whereExists(fn($q) => $q->from('indicador_medicos as im_pri')
-                    ->where('im_pri.medico_id', $pId)
-                    ->whereColumn('im_pri.uci_id', 'im_dup.uci_id')
-                    ->whereColumn('im_pri.mes', 'im_dup.mes')
-                    ->whereColumn('im_pri.anio', 'im_dup.anio')
-                )
-                ->delete();
+            $clavesIndicadorPrimario = DB::table('indicador_medicos')
+                ->where('medico_id', $pId)
+                ->get(['uci_id', 'mes', 'anio'])
+                ->map(fn($r) => $r->uci_id . '|' . $r->mes . '|' . $r->anio)
+                ->toArray();
+            if (!empty($clavesIndicadorPrimario)) {
+                $idsConflictoIndicador = DB::table('indicador_medicos')
+                    ->where('medico_id', $dId)
+                    ->get(['id', 'uci_id', 'mes', 'anio'])
+                    ->filter(fn($r) => in_array($r->uci_id . '|' . $r->mes . '|' . $r->anio, $clavesIndicadorPrimario))
+                    ->pluck('id')->toArray();
+                if (!empty($idsConflictoIndicador)) {
+                    DB::table('indicador_medicos')->whereIn('id', $idsConflictoIndicador)->delete();
+                }
+            }
             DB::table('indicador_medicos')->where('medico_id', $dId)->update(['medico_id' => $pId]);
 
             // 11. users — SET NULL automático, pero si duplicado tiene user y primario no, reasignamos
