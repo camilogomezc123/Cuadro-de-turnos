@@ -20,7 +20,7 @@ class PlanificacionController extends Controller
 
     public function index(Request $request)
     {
-        $archivos  = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
+        $archivos  = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get();
         $ucis      = Uci::where('activa', true)->orderBy('nombre')->get();
         $tiposTurno= TipoTurno::where('activo', true)->orderBy('codigo')->get();
 

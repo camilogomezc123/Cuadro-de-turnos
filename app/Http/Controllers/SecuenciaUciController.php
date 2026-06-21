@@ -191,6 +191,15 @@ class SecuenciaUciController extends Controller
         return back()->with('success', 'Médico agregado a la secuencia.');
     }
 
+    public function actualizarDetalle(Request $request, SecuenciaUciDetalle $detalle)
+    {
+        $request->validate(['codigo_turno' => 'nullable|string|max:10']);
+        $codigo = strtoupper(trim($request->codigo_turno ?? ''));
+        if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
+        $detalle->update(['codigo_turno' => $codigo]);
+        return response()->json(['ok' => true, 'codigo' => $codigo]);
+    }
+
     public function destroy(SecuenciaUci $secuencia)
     {
         $secuencia->update(['activa' => false]);

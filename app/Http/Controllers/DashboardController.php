@@ -23,9 +23,8 @@ class DashboardController extends Controller
         $meses  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-        $archivos  = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
-        $archivoId = $request->archivo_id ?? ArchivoCargado::where('procesado',true)
-                        ->where('mes',$mes)->where('anio',$anio)->value('id');
+        $archivos  = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get();
+        $archivoId = $request->archivo_id ?? ArchivoCargado::where('mes',$mes)->where('anio',$anio)->value('id');
         $archivo   = $archivos->find($archivoId);
 
         // ── KPIs principales ────────────────────────────────────
@@ -37,7 +36,6 @@ class DashboardController extends Controller
             ->sum('horas_total');
 
         $horasReconocidas = TurnoMedico::whereYear('fecha',$anio)->whereMonth('fecha',$mes)
-            ->where('fue_laborado', true)
             ->sum(DB::raw('COALESCE(horas_reconocidas, horas_total)'));
 
         $horasRestadas = $horasProgramadas - $horasReconocidas;

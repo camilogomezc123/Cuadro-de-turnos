@@ -46,6 +46,7 @@ class ConfiguracionController extends Controller
         AuditoriaSistema::registrar('ACTUALIZAR_CONFIG', 'configuracion', 'ConfiguracionCoberturaUci', $config->id,
             null, $data, "Configuración de cobertura actualizada para {$uci->nombre}");
 
-        return back()->with('success', "Configuración de {$uci->nombre} actualizada.");
+        return back()->with('success', "Configuración de {$uci->nombre} actualizada.")
+                     ->with('success_uci_id', $uci->id);
     }
 }

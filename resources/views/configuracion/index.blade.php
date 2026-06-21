@@ -6,6 +6,13 @@
 @endsection
 @section('content')
 
+@if(session('success'))
+<div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
+
 <div class="row g-4">
     {{-- Tipos de turno --}}
     <div class="col-lg-4">
@@ -41,7 +48,7 @@
             <div class="panel-body">
                 @foreach($ucis as $uci)
                 @php $cfg = $configs[$uci->id]; @endphp
-                <details class="mb-3 border rounded-3 p-3">
+                <details class="mb-3 border rounded-3 p-3" id="uci-cfg-{{ $uci->id }}">
                     <summary class="fw-semibold" style="cursor:pointer">
                         <i class="bi bi-hospital me-1 text-primary"></i>{{ $uci->nombre }}
                     </summary>
@@ -106,3 +113,18 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uciId = @json(session('success_uci_id'));
+    if (uciId) {
+        const el = document.getElementById('uci-cfg-' + uciId);
+        if (el) {
+            el.open = true;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+});
+</script>
+@endpush

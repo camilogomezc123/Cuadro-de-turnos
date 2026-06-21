@@ -78,13 +78,27 @@
         </div>
     </div>
     <div class="panel-body">
+        <p class="small text-muted mb-2"><i class="bi bi-pencil-square me-1 text-primary"></i>Haga clic en cualquier celda de turno para editarla directamente.</p>
         <div class="table-responsive">
-            <table class="table table-custom" style="font-size:.82rem">
+            <table class="table table-bordered table-custom" style="font-size:.80rem; min-width:820px">
                 <thead>
                     <tr>
-                        <th>Médico</th>
-                        <th>Lun</th><th>Mar</th><th>Mié</th><th>Jue</th><th>Vie</th><th>Sáb</th><th>Dom</th>
-                        <th>Vigencia</th>
+                        <th rowspan="2" class="align-middle" style="min-width:140px">Médico</th>
+                        <th colspan="7" class="text-center" style="background:#eef2ff;color:#3730a3">
+                            <i class="bi bi-calendar-week me-1"></i>Semana 1
+                        </th>
+                        <th colspan="7" class="text-center" style="background:#ecfdf5;color:#065f46">
+                            <i class="bi bi-calendar-week me-1"></i>Semana 2 (patrón repetido)
+                        </th>
+                        <th rowspan="2" class="align-middle" style="min-width:90px">Vigencia</th>
+                    </tr>
+                    <tr>
+                        @foreach(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as $dl)
+                            <th class="text-center" style="background:#eef2ff;font-size:.78rem">{{ $dl }}</th>
+                        @endforeach
+                        @foreach(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'] as $dl)
+                            <th class="text-center" style="background:#ecfdf5;font-size:.78rem">{{ $dl }}</th>
+                        @endforeach
                     </tr>
                 </thead>
                 <tbody>
@@ -93,23 +107,45 @@
                     @endphp
                     @forelse($porMedico as $midId => $dets)
                     @php
-                        $medico = $dets->first()->medico;
+                        $medico  = $dets->first()->medico;
                         $diasMap = $dets->keyBy('dia_semana');
                     @endphp
                     <tr>
-                        <td class="fw-bold">{{ $medico?->nombre_completo ?? '—' }}</td>
+                        <td class="fw-bold align-middle">{{ $medico?->nombre_completo ?? '—' }}</td>
+                        {{-- Semana 1 --}}
                         @for($d = 0; $d <= 6; $d++)
                             @php $det = $diasMap[$d] ?? null; @endphp
-                            <td>
+                            <td class="text-center align-middle celda-seq {{ in_array($d,[5,6]) ? 'table-light' : '' }}"
+                                data-det-id="{{ $det?->id ?? '' }}"
+                                data-codigo="{{ $det?->codigo_turno ?? '' }}"
+                                style="cursor:{{ $det?->id ? 'pointer' : 'default' }}; background:{{ in_array($d,[5,6]) ? '#f0f4ff' : '' }}">
                                 @if($det?->codigo_turno)
                                     <span class="badge badge-{{ $det->codigo_turno }}">{{ $det->codigo_turno }}</span>
+                                @elseif($det?->id)
+                                    <span class="text-muted small">—</span>
                                 @else
-                                    <span class="text-muted">—</span>
+                                    <span class="text-muted" style="opacity:.3">·</span>
                                 @endif
                             </td>
                         @endfor
-                        <td>
-                            <small>
+                        {{-- Semana 2 (misma secuencia) --}}
+                        @for($d = 0; $d <= 6; $d++)
+                            @php $det = $diasMap[$d] ?? null; @endphp
+                            <td class="text-center align-middle celda-seq"
+                                data-det-id="{{ $det?->id ?? '' }}"
+                                data-codigo="{{ $det?->codigo_turno ?? '' }}"
+                                style="cursor:{{ $det?->id ? 'pointer' : 'default' }}; background:{{ in_array($d,[5,6]) ? '#e6f9f0' : '#f8fffe' }}">
+                                @if($det?->codigo_turno)
+                                    <span class="badge badge-{{ $det->codigo_turno }}">{{ $det->codigo_turno }}</span>
+                                @elseif($det?->id)
+                                    <span class="text-muted small">—</span>
+                                @else
+                                    <span class="text-muted" style="opacity:.3">·</span>
+                                @endif
+                            </td>
+                        @endfor
+                        <td class="align-middle">
+                            <small class="text-muted">
                                 {{ $dets->first()?->fecha_inicio_vigencia?->format('d/m/Y') ?? '—' }}
                                 @if($dets->first()?->fecha_fin_vigencia)
                                     → {{ $dets->first()->fecha_fin_vigencia->format('d/m/Y') }}
@@ -118,7 +154,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="9" class="text-muted text-center">Sin médicos en esta secuencia.</td></tr>
+                    <tr><td colspan="16" class="text-muted text-center py-3">Sin médicos en esta secuencia.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -287,8 +323,89 @@
 
 @push('scripts')
 <script>
-const MEDICOS = @json($medicos->map(fn($m)=>['id'=>$m->id,'nombre'=>$m->nombre_completo]));
-const CODIGOS  = ['','M','T','MT','N','MTN','MN','PER','INC','LIBRE'];
+const MEDICOS       = @json($medicos->map(fn($m)=>['id'=>$m->id,'nombre'=>$m->nombre_completo]));
+const CODIGOS       = ['','M','T','MT','N','MTN','MN','PER','INC','LIBRE'];
+const CODIGOS_SEQ   = ['','M','T','MT','N','MTN','MN','PER','INC','LIBRE'];
+const CSRF_SEQ      = '{{ csrf_token() }}';
+
+// ── Edición inline de celdas de secuencia ──────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.celda-seq[data-det-id]').forEach(td => {
+        if (!td.dataset.detId) return;
+        td.addEventListener('click', function() {
+            iniciarEdicionSeq(this);
+        });
+    });
+});
+
+function iniciarEdicionSeq(td) {
+    const detId  = td.dataset.detId;
+    if (!detId) return;
+    const codigo = td.dataset.codigo || '';
+
+    const originalHTML = td.innerHTML;
+
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm p-0 text-center';
+    sel.style.cssText = 'min-width:60px;font-size:11px;font-weight:bold;height:26px;border-radius:4px';
+
+    CODIGOS_SEQ.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value       = c;
+        opt.textContent = c || '—';
+        if (c === codigo) opt.selected = true;
+        sel.appendChild(opt);
+    });
+
+    td.innerHTML = '';
+    td.appendChild(sel);
+    sel.focus();
+
+    let guardado = false;
+
+    sel.addEventListener('change', async function() {
+        guardado = true;
+        const nuevo = this.value;
+        // Optimistic: actualizar todas las celdas del mismo detalle
+        actualizarCeldasDetalle(detId, nuevo);
+
+        try {
+            const resp = await fetch(`/secuencias/detalle/${detId}`, {
+                method : 'PATCH',
+                headers: {
+                    'Content-Type' : 'application/json',
+                    'X-CSRF-TOKEN' : CSRF_SEQ,
+                    'Accept'       : 'application/json',
+                },
+                body: JSON.stringify({ codigo_turno: nuevo }),
+            });
+            const data = await resp.json();
+            if (!data.ok) {
+                // Revert
+                actualizarCeldasDetalle(detId, codigo);
+            }
+        } catch(e) {
+            actualizarCeldasDetalle(detId, codigo);
+        }
+    });
+
+    sel.addEventListener('blur', function() {
+        if (!guardado) {
+            setTimeout(() => { td.innerHTML = originalHTML; }, 100);
+        }
+    });
+}
+
+function actualizarCeldasDetalle(detId, codigo) {
+    document.querySelectorAll(`.celda-seq[data-det-id="${detId}"]`).forEach(cell => {
+        cell.dataset.codigo = codigo;
+        if (codigo) {
+            cell.innerHTML = `<span class="badge badge-${codigo}">${codigo}</span>`;
+        } else {
+            cell.innerHTML = '<span class="text-muted small">—</span>';
+        }
+    });
+}
 let filaIdx = 0;
 
 function agregarFilaMedico() {

@@ -38,8 +38,7 @@ class TurnoEditorController extends Controller
         $anio    = (int)($request->anio    ?? now()->year);
 
         $uci     = $ucis->find($uciId);
-        $archivo = ArchivoCargado::where('mes', $mes)->where('anio', $anio)
-                        ->where('procesado', true)->first();
+        $archivo = ArchivoCargado::where('mes', $mes)->where('anio', $anio)->first();
 
         // Médicos con turnos ya cargados en esta UCI/mes
         $medicosExistentes = collect();
@@ -68,8 +67,7 @@ class TurnoEditorController extends Controller
         $todosMedicos = Medico::orderBy('nombre')->get();
 
         // Meses con datos (para repetir secuencia)
-        $mesesConDatos = ArchivoCargado::where('procesado', true)
-            ->orderByDesc('anio')->orderByDesc('mes')->get(['id','mes','anio']);
+        $mesesConDatos = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get(['id','mes','anio']);
 
         // Info de días del mes seleccionado
         $diasInfo = $this->generarDiasInfo($mes, $anio);
@@ -147,6 +145,7 @@ class TurnoEditorController extends Controller
                         'horas_total'     => $horas,
                         'es_fin_semana'   => $esFinde,
                         'es_domingo'      => ($dow === 0),
+                        'fue_laborado'    => true,
                         'created_at'      => now(),
                         'updated_at'      => now(),
                     ];
@@ -183,10 +182,10 @@ class TurnoEditorController extends Controller
         $anioOrigen = (int)$request->anio_origen;
 
         $archivoOrigen = ArchivoCargado::where('mes', $mesOrigen)
-            ->where('anio', $anioOrigen)->where('procesado', true)->first();
+            ->where('anio', $anioOrigen)->first();
 
         if (!$archivoOrigen) {
-            return back()->with('error', 'No existe un mes origen procesado con esos datos.');
+            return back()->with('error', 'No existe un mes origen con esos datos.');
         }
 
         // Extraer patrón semanal (día-de-semana → código) por médico
@@ -262,6 +261,7 @@ class TurnoEditorController extends Controller
                                 'horas_total'     => $horas,
                                 'es_fin_semana'   => in_array($dow, [0,6]),
                                 'es_domingo'      => ($dow === 0),
+                                'fue_laborado'    => true,
                                 'created_at'      => now(),
                                 'updated_at'      => now(),
                             ];
