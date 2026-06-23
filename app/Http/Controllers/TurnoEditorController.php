@@ -197,22 +197,27 @@ class TurnoEditorController extends Controller
             return back()->with('error', "No hay turnos de {$uci->nombre} en el mes origen.");
         }
 
-        // patron[medicoId][0..6] = código más frecuente para ese día de semana
+        // Patrón: usa el turno con updated_at más reciente por médico/día-semana.
+        // Esto respeta las ediciones manuales: si el usuario cambió un lunes específico,
+        // ese código "gana" porque tiene updated_at más nuevo que los insertados en bloque.
         $patron = [];
         foreach ($turnosOrigen as $t) {
-            $fecha = Carbon::parse($t->fecha);
-            $dow   = $fecha->dayOfWeek; // 0=Dom
-            $idx   = ($dow === 0) ? 6 : $dow - 1; // 0=Lun
-            $patron[$t->medico_id][$idx][] = $t->codigo_turno;
+            $fecha    = Carbon::parse($t->fecha);
+            $dow      = $fecha->dayOfWeek; // 0=Dom
+            $idx      = ($dow === 0) ? 6 : $dow - 1; // 0=Lun
+            $medicoId = $t->medico_id;
+            $tAt      = $t->updated_at;
+
+            $prev = $patron[$medicoId][$idx] ?? null;
+            if (!$prev || ($tAt && (!$prev['at'] || $tAt > $prev['at']))) {
+                $patron[$medicoId][$idx] = ['codigo' => $t->codigo_turno, 'at' => $tAt];
+            }
         }
 
-        // Votar por el código más frecuente por día
         $patronFinal = [];
         foreach ($patron as $medicoId => $dias) {
-            foreach ($dias as $idx => $codigos) {
-                $counts = array_count_values($codigos);
-                arsort($counts);
-                $patronFinal[$medicoId][$idx] = array_key_first($counts);
+            foreach ($dias as $idx => $data) {
+                $patronFinal[$medicoId][$idx] = $data['codigo'];
             }
         }
 

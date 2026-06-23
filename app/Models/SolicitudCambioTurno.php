@@ -10,7 +10,7 @@ class SolicitudCambioTurno extends Model
 
     protected $fillable = [
         'tipo_movimiento',
-        'turno_origen_id', 'turno_destino_id',
+        'turno_origen_id', 'componente_turno', 'turno_destino_id',
         'medico_solicitante_id', 'medico_receptor_id',
         'motivo', 'estado',
         'respuesta_colega', 'respondido_colega_at',

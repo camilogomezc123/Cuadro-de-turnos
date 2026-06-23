@@ -69,12 +69,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/novedades',      [NovedadController::class, 'store'])->name('novedades.store');
     Route::get('/cambios-turno',            [CambioTurnoController::class, 'index'])    ->name('cambios-turno.index');
     Route::get('/cambios-turno/mis-turnos', [CambioTurnoController::class, 'misTurnos'])->name('cambios-turno.mis-turnos');
-    Route::get('/cambios-turno/{cambioTurno}', [CambioTurnoController::class, 'show']) ->name('cambios-turno.show');
 
-    // Médico puede crear solicitud y responder como receptor (aceptar/rechazar)
+    // Médico puede crear solicitud, responder como receptor, y cancelar la propia
     Route::post('/cambios-turno',                              [CambioTurnoController::class, 'store'])          ->name('cambios-turno.store');
     Route::patch('/cambios-turno/{cambio}/aceptar',            [CambioTurnoController::class, 'aceptar'])        ->name('cambios-turno.aceptar');
     Route::patch('/cambios-turno/{cambio}/rechazar-colega',    [CambioTurnoController::class, 'rechazarColega']) ->name('cambios-turno.rechazar-colega');
+    Route::patch('/cambios-turno/{cambio}/cancelar',           [CambioTurnoController::class, 'cancelar'])       ->name('cambios-turno.cancelar');
 
     // ── Solo maestro ──────────────────────────────────────────────
     Route::middleware('master')->group(function () {
@@ -110,6 +110,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])   ->name('secuencias.agregar-medico');
         Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])          ->name('secuencias.destroy');
         Route::patch('/secuencias/detalle/{detalle}',         [SecuenciaUciController::class, 'actualizarDetalle'])->name('secuencias.detalle.update');
+        Route::put('/secuencias/{secuencia}/celda/{medicoId}/{dia}', [SecuenciaUciController::class, 'setCelda']) ->name('secuencias.celda.set');
 
         // Novedades (maestro: registrar no asistencia, actualizar, eliminar)
         Route::post('/novedades/no-asistencia/{turno}',   [NovedadController::class, 'registrarNoAsistencia'])->name('novedades.no-asistencia');

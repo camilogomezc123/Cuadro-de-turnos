@@ -197,7 +197,23 @@ class SecuenciaUciController extends Controller
         $codigo = strtoupper(trim($request->codigo_turno ?? ''));
         if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
         $detalle->update(['codigo_turno' => $codigo]);
-        return response()->json(['ok' => true, 'codigo' => $codigo]);
+        return response()->json(['ok' => true, 'codigo' => $codigo, 'det_id' => $detalle->id]);
+    }
+
+    // Crear o actualizar una celda de secuencia (para celdas vacías que no tienen detalle)
+    public function setCelda(Request $request, SecuenciaUci $secuencia, int $medicoId, int $dia)
+    {
+        $request->validate(['codigo_turno' => 'nullable|string|max:10']);
+        $codigo = strtoupper(trim($request->codigo_turno ?? ''));
+        if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
+        $esFinde = in_array($dia, [5, 6]);
+
+        $detalle = SecuenciaUciDetalle::updateOrCreate(
+            ['secuencia_uci_id' => $secuencia->id, 'medico_id' => $medicoId, 'dia_semana' => $dia],
+            ['codigo_turno' => $codigo, 'es_fin_de_semana' => $esFinde]
+        );
+
+        return response()->json(['ok' => true, 'codigo' => $codigo, 'det_id' => $detalle->id]);
     }
 
     public function destroy(SecuenciaUci $secuencia)

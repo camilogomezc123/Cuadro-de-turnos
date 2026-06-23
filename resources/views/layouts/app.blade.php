@@ -271,8 +271,13 @@
         @else
         {{-- ── MENÚ MAESTRO ──────────────────────────── --}}
         @php
-            $alertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
-            $cambiosPendientes= \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+            try {
+                $alertasAbiertas   = \App\Models\AlertaTurno::where('estado','abierta')->count();
+                $cambiosPendientes = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+            } catch (\Throwable $e) {
+                $alertasAbiertas   = 0;
+                $cambiosPendientes = 0;
+            }
         @endphp
 
         <div class="sidebar-section">Principal</div>
@@ -326,7 +331,10 @@
         </a>
 
         <div class="sidebar-section">Bienestar</div>
-        @php $alertasBurnout = \App\Models\BurnoutAlerta::where('estado','activa')->count(); @endphp
+        @php
+            try { $alertasBurnout = \App\Models\BurnoutAlerta::where('estado','activa')->count(); }
+            catch (\Throwable $e) { $alertasBurnout = 0; }
+        @endphp
         <a class="nav-link {{ request()->routeIs('burnout.*') ? 'active' : '' }}" href="{{ route('burnout.index') }}">
             <i class="bi bi-heart-pulse"></i> Burnout
             @if($alertasBurnout > 0)
@@ -470,9 +478,15 @@
     @auth
     @if(auth()->user()->esMaster())
     @php
-        $totalAlertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
-        $alertasBurnoutActivas = \App\Models\BurnoutAlerta::where('estado','activa')->where('nivel_riesgo','critico')->count();
-        $cambiosPend           = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+        try {
+            $totalAlertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
+            $alertasBurnoutActivas = \App\Models\BurnoutAlerta::where('estado','activa')->where('nivel_riesgo','critico')->count();
+            $cambiosPend           = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+        } catch (\Throwable $e) {
+            $totalAlertasAbiertas  = 0;
+            $alertasBurnoutActivas = 0;
+            $cambiosPend           = 0;
+        }
     @endphp
     @if($totalAlertasAbiertas > 0 || $alertasBurnoutActivas > 0 || $cambiosPend > 0)
     <div class="px-4 pb-0 pt-1">

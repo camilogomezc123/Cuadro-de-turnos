@@ -85,7 +85,7 @@
     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaSecuencia">
         <i class="bi bi-calendar-plus me-1"></i>Nueva secuencia
     </button>
-    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRepetir" @if(!$archivo) disabled @endif>
+    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalRepetir" @if(!$archivo || $medicosExistentes->isEmpty()) disabled @endif>
         <i class="bi bi-arrow-repeat me-1"></i>Repetir a otros meses
     </button>
     <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalAgregarMedico" @if(!$archivo) disabled @endif>
