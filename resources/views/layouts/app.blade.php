@@ -225,6 +225,18 @@
     </style>
     @stack('styles')
     @stack('head-styles')
+    <style>
+    @media print {
+        .sidebar, .topbar, .d-print-none, .nav, .btn, .alert, .breadcrumb,
+        .sidebar-overlay, form.d-print-none { display:none !important; }
+        .main-content { margin-left:0 !important; padding:0 !important; }
+        .content-area { padding:0 !important; }
+        .panel { box-shadow:none !important; border:1px solid #ccc !important; page-break-inside:avoid; }
+        body { background:#fff !important; font-size:11px; }
+        .table { font-size:11px; }
+        h4, h5, h6 { font-size:13px; }
+    }
+    </style>
 </head>
 <body>
 
@@ -247,8 +259,11 @@
         @php
             $pendientesMedico = 0;
             if ($user->medico_id) {
-                $pendientesMedico = \App\Models\SolicitudCambioTurno::where('medico_receptor_id', $user->medico_id)
-                    ->whereIn('estado',['pendiente','enviado_a_receptor'])->count();
+                $cacheKey = 'sidebar_medico_pendientes_' . $user->medico_id;
+                $pendientesMedico = \Illuminate\Support\Facades\Cache::remember($cacheKey, 120, fn() =>
+                    \App\Models\SolicitudCambioTurno::where('medico_receptor_id', $user->medico_id)
+                        ->whereIn('estado',['pendiente','enviado_a_receptor'])->count()
+                );
             }
         @endphp
         <div class="sidebar-section">Mi Portal</div>
@@ -264,6 +279,9 @@
         <a class="nav-link {{ request()->routeIs('novedades.*') ? 'active' : '' }}" href="{{ route('novedades.index') }}">
             <i class="bi bi-clipboard2-pulse"></i> Mis Novedades
         </a>
+        <a class="nav-link {{ request()->routeIs('mi-turno.*') ? 'active' : '' }}" href="{{ route('mi-turno.index') }}">
+            <i class="bi bi-calendar-check"></i> Mi Turno del Mes
+        </a>
         <a class="nav-link {{ request()->routeIs('cambios-turno.*') ? 'active' : '' }}" href="{{ route('cambios-turno.index') }}">
             <i class="bi bi-arrow-left-right"></i> Mis Cambios de Turno
         </a>
@@ -272,8 +290,8 @@
         {{-- ── MENÚ MAESTRO ──────────────────────────── --}}
         @php
             try {
-                $alertasAbiertas   = \App\Models\AlertaTurno::where('estado','abierta')->count();
-                $cambiosPendientes = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+                $alertasAbiertas   = \Illuminate\Support\Facades\Cache::remember('sidebar_alertas_abiertas', 120, fn() => \App\Models\AlertaTurno::where('estado','abierta')->count());
+                $cambiosPendientes = \Illuminate\Support\Facades\Cache::remember('sidebar_cambios_pendientes', 120, fn() => \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count());
             } catch (\Throwable $e) {
                 $alertasAbiertas   = 0;
                 $cambiosPendientes = 0;
@@ -357,6 +375,9 @@
         </a>
         <a class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}" href="{{ route('reportes.index') }}">
             <i class="bi bi-file-earmark-bar-graph"></i> Reportes
+        </a>
+        <a class="nav-link {{ request()->routeIs('historial.*') ? 'active' : '' }}" href="{{ route('historial.index') }}">
+            <i class="bi bi-clock-history"></i> Historial de Ediciones
         </a>
         <a class="nav-link {{ request()->routeIs('configuracion.*') ? 'active' : '' }}" href="{{ route('configuracion.index') }}">
             <i class="bi bi-gear"></i> Configuración
@@ -479,9 +500,9 @@
     @if(auth()->user()->esMaster())
     @php
         try {
-            $totalAlertasAbiertas  = \App\Models\AlertaTurno::where('estado','abierta')->count();
-            $alertasBurnoutActivas = \App\Models\BurnoutAlerta::where('estado','activa')->where('nivel_riesgo','critico')->count();
-            $cambiosPend           = \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count();
+            $totalAlertasAbiertas  = \Illuminate\Support\Facades\Cache::remember('sidebar_alertas_abiertas', 120, fn() => \App\Models\AlertaTurno::where('estado','abierta')->count());
+            $alertasBurnoutActivas = \Illuminate\Support\Facades\Cache::remember('sidebar_burnout_criticas', 120, fn() => \App\Models\BurnoutAlerta::where('estado','activa')->where('nivel_riesgo','critico')->count());
+            $cambiosPend           = \Illuminate\Support\Facades\Cache::remember('sidebar_cambios_pendientes', 120, fn() => \App\Models\SolicitudCambioTurno::pendientesParaMaestro()->count());
         } catch (\Throwable $e) {
             $totalAlertasAbiertas  = 0;
             $alertasBurnoutActivas = 0;

@@ -10,6 +10,7 @@ use App\Models\AuditoriaSistema;
 use App\Services\TurnoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class CambioTurnoController extends Controller
 {
@@ -139,6 +140,20 @@ class CambioTurnoController extends Controller
         AuditoriaSistema::registrar('SOLICITAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $solicitud->id,
             null, $data, "Solicitud de {$tipoLabel} del médico #{$turnoOrigen->medico_id}");
 
+        Cache::forget('sidebar_cambios_pendientes');
+        Cache::forget('sidebar_medico_pendientes_' . $data['medico_receptor_id']);
+
+        // Notificar al médico receptor por email
+        try {
+            $receptor = Medico::find($data['medico_receptor_id']);
+            if ($receptor && $receptor->email) {
+                \Illuminate\Support\Facades\Mail::to($receptor->email)
+                    ->send(new \App\Mail\SolicitudCambioTurnoMail($solicitud));
+            }
+        } catch (\Throwable $e) {
+            // Email falla silenciosamente (driver puede ser 'log')
+        }
+
         $msg = $tipo === 'donacion_directa'
             ? 'Solicitud de cedencia enviada. El colega debe aceptar recibirla.'
             : 'Solicitud de cambio enviada. Esperando respuesta del colega.';
@@ -230,6 +245,20 @@ class CambioTurnoController extends Controller
         $tOrigen = $cambio->turnoOrigen;
         if (!$tOrigen) {
             return back()->with('error', 'El turno de origen ya no existe.');
+        }
+
+        // Verificar que el turno sigue siendo compatible con lo que se ofreció
+        $comp = $cambio->componente_turno;
+        if ($comp) {
+            $ofrecibles = array_column(self::componentesOfrecibles($tOrigen->codigo_turno), 'valor');
+            if (!in_array($comp, $ofrecibles)) {
+                return back()->with('error',
+                    "El turno de origen ya no contiene el componente '{$comp}' ofrecido " .
+                    "(código actual: {$tOrigen->codigo_turno}). El turno fue modificado tras crear la solicitud."
+                );
+            }
+        } elseif (in_array($tOrigen->codigo_turno, ['LIBRE', ''])) {
+            return back()->with('error', 'El turno de origen ya no existe (fue marcado como LIBRE).');
         }
 
         if ($cambio->tipo_movimiento === 'donacion_directa') {
@@ -350,6 +379,7 @@ class CambioTurnoController extends Controller
 
         $cambio->update(['estado' => 'aprobado_coordinador', 'aprobado_por' => 'coordinador', 'resuelto_at' => now()]);
         AuditoriaSistema::registrar('APROBAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
+        Cache::forget('sidebar_cambios_pendientes');
         return back()->with('success', 'Cambio aprobado y aplicado. Las horas han sido recalculadas.');
     }
 
@@ -364,6 +394,7 @@ class CambioTurnoController extends Controller
             'resuelto_at'        => now(),
         ]);
         AuditoriaSistema::registrar('RECHAZAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
+        Cache::forget('sidebar_cambios_pendientes');
         return back()->with('success', 'Solicitud rechazada por el coordinador.');
     }
 

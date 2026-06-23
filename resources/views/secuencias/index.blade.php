@@ -5,6 +5,31 @@
     <li class="breadcrumb-item active">Secuencias UCI</li>
 @endsection
 
+@push('styles')
+<style>
+.seq-scroll-wrapper {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+    border-radius: 6px;
+}
+.seq-scroll-wrapper::-webkit-scrollbar { height: 6px; }
+.seq-scroll-wrapper::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+@media (max-width: 767px) {
+    .seq-scroll-wrapper { position: relative; }
+    .seq-scroll-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 28px; height: 100%;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,.8));
+        pointer-events: none;
+    }
+    .table-custom td, .table-custom th { padding: .3rem .4rem !important; font-size: .72rem !important; }
+}
+</style>
+@endpush
+
 @section('content')
 <div class="fade-in">
 
@@ -78,7 +103,7 @@
             <i class="bi bi-pencil-square me-1 text-primary"></i>
             Haga clic en <strong>cualquier celda</strong> para editar el turno. Las celdas vacías también son editables.
         </p>
-        <div class="table-responsive">
+        <div class="table-responsive seq-scroll-wrapper">
             <table class="table table-bordered table-custom" style="font-size:.80rem; min-width:820px">
                 <thead>
                     <tr>

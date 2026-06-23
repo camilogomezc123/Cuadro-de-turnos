@@ -155,6 +155,9 @@
                     <i class="bi bi-file-excel me-1"></i>Descargar Excel
                 </button>
                 @endif
+                <button class="btn btn-outline-secondary btn-sm d-print-none" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i>Imprimir
+                </button>
             </div>
         </form>
     </div>

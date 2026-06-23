@@ -22,6 +22,8 @@ use App\Http\Controllers\UciController;
 use App\Http\Controllers\MedicoPortalController;
 use App\Http\Controllers\BurnoutController;
 use App\Http\Controllers\MedicoDuplicadoController;
+use App\Http\Controllers\MiTurnoController;
+use App\Http\Controllers\HistorialController;
 use Illuminate\Support\Facades\Route;
 
 // ── Autenticación (públicas) ────────────────────────────────────
@@ -63,6 +65,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/ucis',       [UciController::class, 'index'])->name('ucis.index');
     Route::get('/ucis/{uci}', [UciController::class, 'show']) ->name('ucis.show');
+
+    // ── Mi Turno (médico operativo ve su propio cuadro del mes) ────
+    Route::get('/mi-turno', [MiTurnoController::class, 'index'])->name('mi-turno.index');
 
     // ── Novedades y cambios: accesibles por operativo (ven solo las suyas) ──
     Route::get('/novedades',       [NovedadController::class, 'index'])->name('novedades.index');
@@ -187,5 +192,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/usuarios/{usuario}',          [AuthController::class, 'eliminarUsuario'])     ->name('usuarios.eliminar');
         Route::patch('/usuarios/{usuario}/password',  [AuthController::class, 'cambiarPassword'])     ->name('usuarios.password');
         Route::patch('/usuarios/{usuario}/toggle',    [AuthController::class, 'toggleUsuario'])       ->name('usuarios.toggle');
+
+        // Historial de ediciones (solo maestro)
+        Route::get('/historial', [HistorialController::class, 'index'])->name('historial.index');
     });
 });
