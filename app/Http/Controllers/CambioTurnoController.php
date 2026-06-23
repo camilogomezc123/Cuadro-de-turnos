@@ -63,9 +63,18 @@ class CambioTurnoController extends Controller
         $medicos     = Medico::where('activo', true)->orderBy('nombre')->get();
         $esMaestro   = $user->esMaster();
 
+        // Pre-cargar mis turnos disponibles (receptor) para evitar N+1 en el listado
+        $misTurnosDisponibles = collect();
+        if ($user->medico_id && $archivo) {
+            $misTurnosDisponibles = TurnoMedico::where('medico_id', $user->medico_id)
+                ->where('archivo_id', $archivoId)
+                ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+                ->orderBy('fecha')->get();
+        }
+
         return view('cambios-turno.index', compact(
             'solicitudes','estado','medicos','esMaestro',
-            'archivos','archivoId','turnos'
+            'archivos','archivoId','turnos','misTurnosDisponibles'
         ));
     }
 
@@ -95,6 +104,32 @@ class CambioTurnoController extends Controller
         ]));
     }
 
+    // ── AJAX: turnos disponibles del médico receptor ─────────────
+
+    public function turnosReceptor(Request $request)
+    {
+        $medicoId  = (int)$request->medico_id;
+        $archivoId = (int)$request->archivo_id;
+
+        if (!$medicoId || !$archivoId) {
+            return response()->json([]);
+        }
+
+        $turnos = TurnoMedico::where('medico_id', $medicoId)
+            ->where('archivo_id', $archivoId)
+            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->orderBy('fecha')
+            ->get(['id','fecha','codigo_turno']);
+
+        return response()->json($turnos->map(fn($t) => [
+            'id'    => $t->id,
+            'dia'   => Carbon::parse($t->fecha)->format('d M'),
+            'fecha' => Carbon::parse($t->fecha)->format('d/m/Y'),
+            'codigo'=> $t->codigo_turno,
+            'horas' => TurnoService::horasPorCodigo($t->codigo_turno)['total'] ?? 0,
+        ]));
+    }
+
     // ── Crear solicitud ───────────────────────────────────────────
 
     public function store(Request $request)
@@ -103,6 +138,7 @@ class CambioTurnoController extends Controller
 
         $data = $request->validate([
             'turno_origen_id'    => 'required|exists:turno_medicos,id',
+            'turno_destino_id'   => 'nullable|exists:turno_medicos,id',
             'componente_turno'   => 'nullable|string|max:10',
             'tipo_movimiento'    => 'nullable|in:cambio_directo,donacion_directa',
             'medico_receptor_id' => 'required|exists:medicos,id',
@@ -113,6 +149,11 @@ class CambioTurnoController extends Controller
 
         if ($user->esMedico() && $user->medico_id && $turnoOrigen->medico_id !== $user->medico_id) {
             return back()->with('error', 'Solo puedes solicitar cambios de tus propios turnos.');
+        }
+
+        // Bug fix: no puedes enviarte una solicitud a ti mismo
+        if ($user->medico_id && (int)$data['medico_receptor_id'] === (int)$user->medico_id) {
+            return back()->with('error', 'No puedes enviarte una solicitud de cambio a ti mismo.');
         }
 
         // Validar que el componente sea ofrecible desde el turno seleccionado
@@ -129,6 +170,7 @@ class CambioTurnoController extends Controller
         $solicitud = SolicitudCambioTurno::create([
             'tipo_movimiento'       => $tipo,
             'turno_origen_id'       => $turnoOrigen->id,
+            'turno_destino_id'      => $tipo === 'cambio_directo' ? ($data['turno_destino_id'] ?? null) : null,
             'componente_turno'      => $componente ?: null,
             'medico_solicitante_id' => $turnoOrigen->medico_id,
             'medico_receptor_id'    => $data['medico_receptor_id'],
@@ -177,10 +219,12 @@ class CambioTurnoController extends Controller
 
         $request->validate(['turno_destino_id' => 'nullable|exists:turno_medicos,id']);
 
-        // Para cedencia, no se necesita turno_destino
-        $turnoDest = ($cambio->tipo_movimiento === 'cambio_directo')
-            ? $request->turno_destino_id
-            : null;
+        // Para cedencia no se necesita turno_destino.
+        // Para cambio_directo: usar el ya propuesto por el solicitante o el que indique el receptor ahora.
+        $turnoDest = null;
+        if ($cambio->tipo_movimiento === 'cambio_directo') {
+            $turnoDest = $cambio->turno_destino_id ?? $request->turno_destino_id;
+        }
 
         $cambio->update([
             'estado'               => 'aceptado_colega',
@@ -340,6 +384,12 @@ class CambioTurnoController extends Controller
             // ── Cambio directo: intercambiar turnos completos ──
             $tDestino = $cambio->turnoDestino;
 
+            if (!$tDestino) {
+                return back()->with('error',
+                    'No se puede aprobar: el médico receptor aún no indicó cuál de sus turnos ofrece a cambio.'
+                );
+            }
+
             if ($tOrigen && $tDestino) {
                 [$codigoA, $codigoB] = [$tOrigen->codigo_turno, $tDestino->codigo_turno];
                 $horasA = TurnoService::horasPorCodigo($codigoB);
@@ -469,8 +519,8 @@ class CambioTurnoController extends Controller
         $mapa = [
             'M'=>'M','T'=>'T','N'=>'N',
             'MT'=>'MT','MN'=>'MN','MTN'=>'MTN',
-            'TN'=>'MTN', // T+N no tiene código propio → MTN (suma M también)
-            'MNT'=>'MTN','MTC'=>'MT','MNT'=>'MTN',
+            'TN'=>'MTN',  // T+N no existe → MTN
+            'MNT'=>'MTN', // variante de ordenamiento
         ];
         return $mapa[$clave] ?? ($nuevo ?: 'LIBRE');
     }
