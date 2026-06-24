@@ -40,7 +40,7 @@ class SecuenciaUciController extends Controller
         ));
     }
 
-    // Crear secuencia con patrón semanal
+    // Crear secuencia con patrón semanal (4 semanas independientes)
     public function store(Request $request)
     {
         $request->validate([
@@ -50,7 +50,7 @@ class SecuenciaUciController extends Controller
             'medicos' => 'required|array|min:1',
             'medicos.*'=> 'exists:medicos,id',
             'patrones'=> 'required|array',
-            // [medico_id][0..6] => codigo (0=lun..6=dom)
+            // patrones[medico_id][semana(1-4)][dia(0-6)] => codigo
         ]);
 
         DB::transaction(function () use ($request) {
@@ -62,22 +62,27 @@ class SecuenciaUciController extends Controller
                 'creada_por_usuario_id'=> Auth::id(),
             ]);
 
-            $patrones = $request->patrones;
+            // patrones[medicoId][semana][dia] => codigo
+            $patrones = $request->patrones ?? [];
 
             foreach ($request->medicos as $medicoId) {
-                $patron = $patrones[$medicoId] ?? [];
-                foreach ($patron as $dia => $codigo) {
-                    $codigo = strtoupper(trim($codigo ?? ''));
-                    if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
+                $semanas = $patrones[$medicoId] ?? [];
+                foreach ($semanas as $semana => $diasMap) {
+                    $semana = max(1, min(4, (int)$semana));
+                    foreach ($diasMap as $dia => $codigo) {
+                        $codigo  = strtoupper(trim($codigo ?? ''));
+                        if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
+                        $esFinde = in_array((int)$dia, [5, 6]);
 
-                    $esFinde = in_array((int)$dia, [5, 6]); // 5=sab, 6=dom
-                    SecuenciaUciDetalle::create([
-                        'secuencia_uci_id' => $secuencia->id,
-                        'medico_id'        => $medicoId,
-                        'dia_semana'       => (int)$dia,
-                        'codigo_turno'     => $codigo,
-                        'es_fin_de_semana' => $esFinde,
-                    ]);
+                        SecuenciaUciDetalle::create([
+                            'secuencia_uci_id' => $secuencia->id,
+                            'medico_id'        => $medicoId,
+                            'dia_semana'       => (int)$dia,
+                            'numero_semana'    => $semana,
+                            'codigo_turno'     => $codigo,
+                            'es_fin_de_semana' => $esFinde,
+                        ]);
+                    }
                 }
             }
 
@@ -149,11 +154,11 @@ class SecuenciaUciController extends Controller
             'nombre_nuevo'       => 'nullable|string|max:100',
             'apellido_nuevo'     => 'nullable|string|max:100',
             'patron'             => 'required|array',
+            // patron[semana(1-4)][dia(0-6)] => codigo
             'reemplaza_medico_id'=> 'nullable|exists:medicos,id',
         ]);
 
         DB::transaction(function () use ($request, $secuencia) {
-            // Crear médico si es nuevo
             $medicoId = $request->medico_id;
             if (!$medicoId && $request->nombre_nuevo) {
                 $medico   = Medico::create([
@@ -165,7 +170,6 @@ class SecuenciaUciController extends Controller
                 $medicoId = $medico->id;
             }
 
-            // Si reemplaza a otro médico: cerrar vigencia del anterior
             if ($request->reemplaza_medico_id) {
                 SecuenciaUciDetalle::where('secuencia_uci_id', $secuencia->id)
                     ->where('medico_id', $request->reemplaza_medico_id)
@@ -173,18 +177,23 @@ class SecuenciaUciController extends Controller
                     ->update(['fecha_fin_vigencia' => now()->toDateString()]);
             }
 
-            // Agregar nuevo médico con patrón
-            foreach ($request->patron as $dia => $codigo) {
-                $codigo  = strtoupper(trim($codigo ?? ''));
-                $esFinde = in_array((int)$dia, [5,6]);
-                SecuenciaUciDetalle::create([
-                    'secuencia_uci_id'    => $secuencia->id,
-                    'medico_id'           => $medicoId,
-                    'dia_semana'          => (int)$dia,
-                    'codigo_turno'        => $codigo,
-                    'es_fin_de_semana'    => $esFinde,
-                    'fecha_inicio_vigencia'=> now()->toDateString(),
-                ]);
+            // patron[semana][dia] => codigo — 4 semanas independientes
+            foreach ($request->patron as $semana => $diasMap) {
+                $semana = max(1, min(4, (int)$semana));
+                foreach ($diasMap as $dia => $codigo) {
+                    $codigo  = strtoupper(trim($codigo ?? ''));
+                    if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
+                    $esFinde = in_array((int)$dia, [5, 6]);
+                    SecuenciaUciDetalle::create([
+                        'secuencia_uci_id'     => $secuencia->id,
+                        'medico_id'            => $medicoId,
+                        'dia_semana'           => (int)$dia,
+                        'numero_semana'        => $semana,
+                        'codigo_turno'         => $codigo,
+                        'es_fin_de_semana'     => $esFinde,
+                        'fecha_inicio_vigencia'=> now()->toDateString(),
+                    ]);
+                }
             }
         });
 
@@ -201,15 +210,16 @@ class SecuenciaUciController extends Controller
     }
 
     // Crear o actualizar una celda de secuencia (para celdas vacías que no tienen detalle)
-    public function setCelda(Request $request, SecuenciaUci $secuencia, int $medicoId, int $dia)
+    public function setCelda(Request $request, SecuenciaUci $secuencia, int $medicoId, int $dia, int $semana = 1)
     {
         $request->validate(['codigo_turno' => 'nullable|string|max:10']);
-        $codigo = strtoupper(trim($request->codigo_turno ?? ''));
+        $semana  = max(1, min(4, $semana));
+        $codigo  = strtoupper(trim($request->codigo_turno ?? ''));
         if (!in_array($codigo, self::CODIGOS_VALIDOS)) $codigo = '';
         $esFinde = in_array($dia, [5, 6]);
 
         $detalle = SecuenciaUciDetalle::updateOrCreate(
-            ['secuencia_uci_id' => $secuencia->id, 'medico_id' => $medicoId, 'dia_semana' => $dia],
+            ['secuencia_uci_id' => $secuencia->id, 'medico_id' => $medicoId, 'dia_semana' => $dia, 'numero_semana' => $semana],
             ['codigo_turno' => $codigo, 'es_fin_de_semana' => $esFinde]
         );
 
@@ -725,46 +735,95 @@ class SecuenciaUciController extends Controller
             })
             ->get();
 
-        // Construir mapa: [medico_id][dia_semana] => codigo
-        $patron = [];
-        foreach ($detalles as $d) {
-            $patron[$d->medico_id][$d->dia_semana] = $d->codigo_turno;
-        }
+        // Detectar si la secuencia usa el nuevo sistema de 4 semanas independientes
+        $usa4Semanas = $detalles->where('numero_semana', '>', 1)->isNotEmpty();
 
-        // Fines de semana rotativos: [semana_num][sabado/domingo][slot] => medico_id
-        $finSemanaDet = $secuencia->detallesFinSemana()->get();
-        $finSemanaMap = [];
-        foreach ($finSemanaDet as $d) {
-            $orden = $d->orden_rotacion_fin_semana ?? 0;
-            $finSemanaMap[$orden][$d->dia_semana][] = ['medico_id'=>$d->medico_id,'codigo'=>$d->codigo_turno];
+        if ($usa4Semanas) {
+            // Sistema nuevo: [medico_id][numero_semana][dia_semana] => codigo
+            $patron4 = [];
+            foreach ($detalles as $d) {
+                $patron4[$d->medico_id][$d->numero_semana][$d->dia_semana] = $d->codigo_turno;
+            }
+            $finSemanaMap = []; // no se usa en el nuevo sistema
+        } else {
+            // Sistema legado: [medico_id][dia_semana] => codigo (hábiles)
+            $patron4   = [];
+            $patronLeg = [];
+            foreach ($detalles->where('es_fin_de_semana', false) as $d) {
+                $patronLeg[$d->medico_id][$d->dia_semana] = $d->codigo_turno;
+            }
+            // Wrap al formato 4-semanas usando la misma para todas (compat.)
+            foreach ($patronLeg as $mid => $dias) {
+                $patron4[$mid][1] = $dias;
+                $patron4[$mid][2] = $dias;
+                $patron4[$mid][3] = $dias;
+                $patron4[$mid][4] = $dias;
+            }
+
+            // Fin de semana rotativo (sistema legado)
+            $finSemanaDet = $secuencia->detallesFinSemana()->get();
+            $finSemanaMap = [];
+            foreach ($finSemanaDet as $d) {
+                $orden = $d->orden_rotacion_fin_semana ?? 0;
+                $finSemanaMap[$orden][$d->dia_semana][] = ['medico_id'=>$d->medico_id,'codigo'=>$d->codigo_turno];
+            }
         }
 
         DB::transaction(function () use (
-            $archivo, $uciId, $mes, $anio, $diasEnMes, $patron, $finSemanaMap, &$turnosCreados
+            $archivo, $uciId, $mes, $anio, $diasEnMes, $patron4, $finSemanaMap, $usa4Semanas, &$turnosCreados
         ) {
             // Borrar turnos previos de esta UCI en este archivo
             TurnoMedico::where('archivo_id', $archivo->id)->where('uci_id', $uciId)->delete();
 
             $filas = [];
             $semanaNum = 0;
-            $ultimoLunes = null;
 
             for ($d = 1; $d <= $diasEnMes; $d++) {
                 $fecha = Carbon::create($anio, $mes, $d);
                 $dow   = $fecha->dayOfWeek; // 0=Dom, 1=Lun ... 6=Sab
                 $idx   = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
 
-                if ($idx === 0) { // lunes nuevo → nueva semana
-                    $semanaNum++;
-                    $ultimoLunes = $d;
-                }
+                if ($idx === 0) $semanaNum++; // lunes nuevo → nueva semana
 
-                $esFinde = in_array($dow, [0, 6]);
+                // Semana del patrón: cicla 1→2→3→4→1→2→...
+                $semanaPatron = (($semanaNum - 1) % 4) + 1;
+
+                $esFinde         = in_array($dow, [0, 6]);
                 $diasNombreShort = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'][$idx];
 
-                // Días hábiles (Lun-Vie)
-                if (!$esFinde) {
-                    foreach ($patron as $medicoId => $dias) {
+                if ($usa4Semanas) {
+                    // Nuevo sistema: todos los días (hábiles + finde) por semana independiente
+                    foreach ($patron4 as $medicoId => $semanas) {
+                        // Fallback: si la semana exacta no tiene datos, usar semana 1
+                        $dias   = $semanas[$semanaPatron] ?? $semanas[1] ?? [];
+                        $codigo = strtoupper($dias[$idx] ?? '');
+                        if ($codigo === '') continue;
+                        $horas  = TurnoMedico::horasPorCodigo($codigo);
+
+                        $filas[] = [
+                            'archivo_id'      => $archivo->id,
+                            'medico_id'       => $medicoId,
+                            'uci_id'          => $uciId,
+                            'fecha'           => $fecha->toDateString(),
+                            'dia_numero'      => $d,
+                            'dia_semana'      => $diasNombreShort,
+                            'codigo_turno'    => $codigo,
+                            'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
+                            'horas_nocturnas' => in_array($codigo,['N','MTN','MN']) ? 12:0,
+                            'horas_total'     => $horas,
+                            'es_fin_semana'   => $esFinde,
+                            'es_domingo'      => ($dow === 0),
+                            'estado_turno'    => 'programado',
+                            'fue_laborado'    => true,
+                            'created_at'      => now(),
+                            'updated_at'      => now(),
+                        ];
+                        $turnosCreados++;
+                    }
+                } elseif (!$esFinde) {
+                    // Legado: días hábiles con patrón fijo
+                    foreach ($patron4 as $medicoId => $semanas) {
+                        $dias   = $semanas[1] ?? [];
                         $codigo = strtoupper($dias[$idx] ?? '');
                         $horas  = TurnoMedico::horasPorCodigo($codigo);
 
@@ -789,8 +848,8 @@ class SecuenciaUciController extends Controller
                         $turnosCreados++;
                     }
                 } else {
-                    // Fin de semana rotativo
-                    $semSlot = (($semanaNum - 1) % max(count($finSemanaMap),1));
+                    // Legado: fin de semana rotativo
+                    $semSlot     = (($semanaNum - 1) % max(count($finSemanaMap),1));
                     $slotMedicos = $finSemanaMap[$semSlot][$idx] ?? [];
 
                     foreach ($slotMedicos as $slot) {

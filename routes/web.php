@@ -116,7 +116,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/secuencias/{secuencia}/agregar-medico', [SecuenciaUciController::class, 'agregarMedico'])   ->name('secuencias.agregar-medico');
         Route::delete('/secuencias/{secuencia}',              [SecuenciaUciController::class, 'destroy'])          ->name('secuencias.destroy');
         Route::patch('/secuencias/detalle/{detalle}',         [SecuenciaUciController::class, 'actualizarDetalle'])->name('secuencias.detalle.update');
-        Route::put('/secuencias/{secuencia}/celda/{medicoId}/{dia}', [SecuenciaUciController::class, 'setCelda']) ->name('secuencias.celda.set');
+        Route::put('/secuencias/{secuencia}/celda/{medicoId}/{dia}/{semana?}', [SecuenciaUciController::class, 'setCelda'])->name('secuencias.celda.set');
 
         // Novedades (maestro: registrar no asistencia, actualizar, eliminar)
         Route::post('/novedades/no-asistencia/{turno}',   [NovedadController::class, 'registrarNoAsistencia'])->name('novedades.no-asistencia');

@@ -1,6 +1,91 @@
 @extends('layouts.app')
-
 @section('title', 'Mi Turno del Mes')
+
+@push('styles')
+<style>
+/* ── KPIs ───────────────────────────── */
+.kpi-card { text-align:center; padding:.9rem .5rem; }
+.kpi-num  { font-size:1.6rem; font-weight:700; line-height:1.1; }
+
+/* ── Cuadrícula calendario ──────────── */
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+.cal-header-day {
+    text-align: center;
+    font-size: .68rem;
+    font-weight: 700;
+    color: #64748b;
+    padding: 3px 0;
+}
+.cal-header-day.finde { color:#e11d48; }
+.cal-cell {
+    min-height: 48px;
+    border-radius: 6px;
+    padding: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    cursor: default;
+}
+.cal-cell.finde    { background: #fff1f2; border-color:#fecdd3; }
+.cal-cell.vacio    { background: transparent; border-color: transparent; }
+.cal-cell.hoy      { border: 2px solid #6366f1 !important; }
+.cal-num {
+    font-size: .68rem;
+    font-weight: 600;
+    color: #475569;
+    align-self: flex-end;
+    margin-bottom: 1px;
+    line-height: 1;
+}
+.cal-cell.finde .cal-num { color:#e11d48; }
+.cal-badge {
+    font-size: .62rem;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 1px 4px;
+    margin-top: auto;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+/* Colores de turno para la cuadrícula */
+.cb-M    { background:#d1fae5; color:#065f46; }
+.cb-T    { background:#dbeafe; color:#1e40af; }
+.cb-MT   { background:#e0e7ff; color:#3730a3; }
+.cb-N    { background:#1e1b4b; color:#e0e7ff; }
+.cb-MTN  { background:#7c3aed; color:#ede9fe; }
+.cb-MN   { background:#4c1d95; color:#ede9fe; }
+.cb-PER  { background:#fef9c3; color:#713f12; }
+.cb-INC  { background:#fee2e2; color:#991b1b; }
+.cb-LIBRE{ background:#f1f5f9; color:#94a3b8; }
+.cb-vacio{ background:transparent; color:transparent; }
+
+/* ── Tabla detalle ──────────────────── */
+.tabla-detalle td, .tabla-detalle th {
+    padding: .35rem .5rem;
+    font-size: .82rem;
+}
+@media (max-width: 575px) {
+    .tabla-detalle { font-size: .76rem; }
+    .tabla-detalle td, .tabla-detalle th { padding: .28rem .35rem; }
+    .kpi-num { font-size:1.3rem; }
+}
+
+/* ── Print ──────────────────────────── */
+@media print {
+    .sidebar, .topbar, .d-print-none { display:none !important; }
+    .content-wrapper { margin-left:0 !important; }
+    .panel { box-shadow:none !important; border:1px solid #ddd !important; }
+    .cal-grid { break-inside: avoid; }
+}
+</style>
+@endpush
 
 @section('content')
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -32,99 +117,162 @@
     <div class="alert alert-warning"><i class="bi bi-exclamation-circle me-2"></i>No tienes turnos registrados para este período.</div>
 @else
 
-{{-- Resumen KPIs --}}
-<div class="row g-3 mb-3">
+{{-- KPIs --}}
+<div class="row g-2 mb-3">
     <div class="col-6 col-md-3">
-        <div class="panel text-center py-3">
-            <div class="fs-3 fw-bold text-primary">{{ number_format($resumen['total_h'], 1) }}h</div>
+        <div class="panel kpi-card">
+            <div class="kpi-num text-primary">{{ number_format($resumen['total_h'], 1) }}h</div>
             <div class="small text-muted">Horas totales</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="panel text-center py-3">
-            <div class="fs-3 fw-bold text-warning">{{ number_format($resumen['diurnas'], 1) }}h</div>
-            <div class="small text-muted">Horas diurnas</div>
+        <div class="panel kpi-card">
+            <div class="kpi-num text-warning">{{ number_format($resumen['diurnas'], 1) }}h</div>
+            <div class="small text-muted">Diurnas</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="panel text-center py-3">
-            <div class="fs-3 fw-bold text-info">{{ number_format($resumen['nocturnas'], 1) }}h</div>
-            <div class="small text-muted">Horas nocturnas</div>
+        <div class="panel kpi-card">
+            <div class="kpi-num text-info">{{ number_format($resumen['nocturnas'], 1) }}h</div>
+            <div class="small text-muted">Nocturnas</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="panel text-center py-3">
-            <div class="fs-3 fw-bold text-success">{{ $turnos->whereNotIn('codigo_turno',['LIBRE',''])->count() }}</div>
+        <div class="panel kpi-card">
+            <div class="kpi-num text-success">{{ $turnos->whereNotIn('codigo_turno',['LIBRE','',' '])->count() }}</div>
             <div class="small text-muted">Días trabajados</div>
         </div>
     </div>
 </div>
 
-{{-- Distribución de códigos --}}
+{{-- Distribución --}}
 @if(!empty($resumen['por_codigo']))
 <div class="panel mb-3">
-    <h6 class="fw-semibold mb-3" style="color:#1a2340">Distribución de turnos</h6>
+    <h6 class="fw-semibold mb-2" style="color:#1a2340;font-size:.87rem">Distribución</h6>
+    @php
+        $cbCls = ['M'=>'cb-M','T'=>'cb-T','MT'=>'cb-MT','N'=>'cb-N','MTN'=>'cb-MTN','MN'=>'cb-MN','PER'=>'cb-PER','INC'=>'cb-INC','LIBRE'=>'cb-LIBRE'];
+    @endphp
     <div class="d-flex flex-wrap gap-2">
-        @php
-            $colores = ['M'=>'primary','T'=>'warning','MT'=>'success','N'=>'info','MTN'=>'danger','MN'=>'purple','LIBRE'=>'secondary'];
-        @endphp
         @foreach($resumen['por_codigo'] as $codigo => $cnt)
-            @php $color = $colores[$codigo] ?? 'secondary'; @endphp
-            <span class="badge bg-{{ $color }} fs-6 px-3 py-2">
-                {{ $codigo }}: {{ $cnt }} día{{ $cnt !== 1 ? 's' : '' }}
-            </span>
+        <span class="cal-badge {{ $cbCls[$codigo] ?? '' }}" style="font-size:.78rem;padding:4px 10px;border-radius:6px">
+            {{ $codigo }} — {{ $cnt }}d
+        </span>
         @endforeach
     </div>
 </div>
 @endif
 
-{{-- Calendario de turnos --}}
-<div class="panel">
-    <h6 class="fw-semibold mb-3" style="color:#1a2340">Detalle del mes</h6>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Fecha</th>
-                    <th>Día</th>
-                    <th>Turno</th>
-                    <th>UCI</th>
-                    <th class="text-end">Horas</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php
-                    $diasEs = ['Mon'=>'Lun','Tue'=>'Mar','Wed'=>'Mié','Thu'=>'Jue','Fri'=>'Vie','Sat'=>'Sáb','Sun'=>'Dom'];
-                    $bgTurno = ['M'=>'rgba(59,130,246,.1)','T'=>'rgba(234,179,8,.1)','MT'=>'rgba(16,185,129,.1)','N'=>'rgba(99,102,241,.1)','MTN'=>'rgba(239,68,68,.1)','MN'=>'rgba(139,92,246,.1)'];
-                @endphp
-                @foreach($turnos as $t)
+{{-- Toggle: Calendario / Lista --}}
+<div class="panel mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h6 class="fw-semibold mb-0" style="color:#1a2340;font-size:.87rem">
+            @if($archivo)
+                {{ \Carbon\Carbon::create($archivo->anio, $archivo->mes)->translatedFormat('F Y') }}
+            @endif
+        </h6>
+        <div class="btn-group btn-group-sm d-print-none" role="group">
+            <input type="radio" class="btn-check" name="vistaToggle" id="vCalendario" checked>
+            <label class="btn btn-outline-primary" for="vCalendario">
+                <i class="bi bi-calendar3 me-1"></i><span class="d-none d-sm-inline">Calendario</span>
+            </label>
+            <input type="radio" class="btn-check" name="vistaToggle" id="vLista">
+            <label class="btn btn-outline-primary" for="vLista">
+                <i class="bi bi-list-ul me-1"></i><span class="d-none d-sm-inline">Lista</span>
+            </label>
+        </div>
+    </div>
+
+    {{-- Vista Calendario --}}
+    <div id="vistaCalendario">
+        @php
+            $mesNum  = (int)$archivo->mes;
+            $anioNum = (int)$archivo->anio;
+            $firstDow = \Carbon\Carbon::create($anioNum, $mesNum, 1)->dayOfWeek; // 0=Dom
+            // Convertir a Lun=0: si Dom(0)->6, else dow-1
+            $primerDia = ($firstDow === 0) ? 6 : $firstDow - 1;
+            $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mesNum, $anioNum);
+            // Indexar turnos por dia_numero
+            $turnosPorDia = $turnos->keyBy('dia_numero');
+            $hoy = now()->day . '-' . now()->month . '-' . now()->year;
+        @endphp
+
+        <div class="cal-grid mb-1">
+            @foreach(['L','M','X','J','V','S','D'] as $i => $dl)
+            <div class="cal-header-day {{ $i >= 5 ? 'finde' : '' }}">{{ $dl }}</div>
+            @endforeach
+        </div>
+
+        <div class="cal-grid">
+            {{-- Celdas vacías antes del día 1 --}}
+            @for($v = 0; $v < $primerDia; $v++)
+            <div class="cal-cell vacio"></div>
+            @endfor
+
+            {{-- Días del mes --}}
+            @for($d = 1; $d <= $diasEnMes; $d++)
+            @php
+                $fecha  = \Carbon\Carbon::create($anioNum, $mesNum, $d);
+                $dow    = $fecha->dayOfWeek;
+                $idx    = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
+                $finde  = $idx >= 5;
+                $turno  = $turnosPorDia[$d] ?? null;
+                $codigo = $turno?->codigo_turno ?? '';
+                $esHoy  = ($d === now()->day && $mesNum === now()->month && $anioNum === now()->year);
+                $cbClass= $cbCls[$codigo] ?? 'cb-vacio';
+            @endphp
+            <div class="cal-cell {{ $finde ? 'finde' : '' }} {{ $esHoy ? 'hoy' : '' }}">
+                <span class="cal-num">{{ $d }}</span>
+                @if($codigo)
+                <span class="cal-badge {{ $cbClass }}">{{ $codigo }}</span>
+                @endif
+            </div>
+            @endfor
+        </div>
+
+        {{-- Leyenda --}}
+        <div class="d-flex flex-wrap gap-1 mt-3">
+            @foreach(['M','T','MT','N','MTN','MN'] as $c)
+            <span class="cal-badge {{ $cbCls[$c] }}">{{ $c }}</span>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Vista Lista --}}
+    <div id="vistaLista" style="display:none">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0 tabla-detalle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Día</th>
+                        <th>Turno</th>
+                        <th class="d-none d-md-table-cell">UCI</th>
+                        <th class="text-end">Horas</th>
+                    </tr>
+                </thead>
+                <tbody>
                     @php
-                        $fecha = \Carbon\Carbon::parse($t->fecha);
-                        $esFinde = $fecha->isWeekend();
-                        $diaEn   = $fecha->format('D');
-                        $diaEs   = $diasEs[$diaEn] ?? $diaEn;
-                        $bg      = $bgTurno[$t->codigo_turno] ?? '';
+                        $diasEs = ['Mon'=>'Lun','Tue'=>'Mar','Wed'=>'Mié','Thu'=>'Jue','Fri'=>'Vie','Sat'=>'Sáb','Sun'=>'Dom'];
                     @endphp
-                    <tr style="{{ $bg ? "background:{$bg}" : '' }}" class="{{ $esFinde ? 'table-secondary' : '' }}">
+                    @foreach($turnos as $t)
+                    @php
+                        $fecha  = \Carbon\Carbon::parse($t->fecha);
+                        $finde  = $fecha->isWeekend();
+                        $diaEs  = $diasEs[$fecha->format('D')] ?? $fecha->format('D');
+                        $codigo = $t->codigo_turno ?: '';
+                        $cbC    = $cbCls[$codigo] ?? 'cb-LIBRE';
+                    @endphp
+                    <tr class="{{ $finde ? 'table-secondary' : '' }}">
                         <td class="fw-semibold">{{ $fecha->format('d/m') }}</td>
+                        <td><span class="{{ $finde ? 'text-danger fw-semibold' : 'text-muted' }}">{{ $diaEs }}</span></td>
                         <td>
-                            <span class="{{ $esFinde ? 'text-danger fw-semibold' : 'text-muted' }}">{{ $diaEs }}</span>
+                            @if($codigo)
+                            <span class="cal-badge {{ $cbC }}" style="font-size:.76rem;padding:2px 7px">{{ $codigo }}</span>
+                            @else
+                            <span class="text-muted">—</span>
+                            @endif
                         </td>
-                        <td>
-                            @php
-                                $badgeColor = match($t->codigo_turno) {
-                                    'M'   => 'primary',
-                                    'T'   => 'warning',
-                                    'MT'  => 'success',
-                                    'N'   => 'info',
-                                    'MTN' => 'danger',
-                                    'MN'  => 'purple',
-                                    default => 'secondary',
-                                };
-                            @endphp
-                            <span class="badge bg-{{ $badgeColor }}">{{ $t->codigo_turno ?: '—' }}</span>
-                        </td>
-                        <td class="text-muted small">{{ $t->uci?->nombre ?? '—' }}</td>
+                        <td class="text-muted small d-none d-md-table-cell">{{ $t->uci?->nombre ?? '—' }}</td>
                         <td class="text-end">
                             @if($t->horas_total)
                                 <strong>{{ number_format($t->horas_total, 0) }}h</strong>
@@ -133,28 +281,34 @@
                             @endif
                         </td>
                     </tr>
-                @endforeach
-            </tbody>
-            <tfoot class="table-light fw-bold">
-                <tr>
-                    <td colspan="4">Total</td>
-                    <td class="text-end">{{ number_format($resumen['total_h'], 1) }}h</td>
-                </tr>
-            </tfoot>
-        </table>
+                    @endforeach
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="3">Total</td>
+                        <td class="d-none d-md-table-cell"></td>
+                        <td class="text-end">{{ number_format($resumen['total_h'], 1) }}h</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 </div>
 
 @endif
 
-@push('styles')
-<style>
-@media print {
-    .sidebar, .topbar, .d-print-none { display:none !important; }
-    .content-wrapper { margin-left:0 !important; }
-    .panel { box-shadow:none !important; border:1px solid #ddd !important; }
-}
-</style>
+@push('scripts')
+<script>
+// Toggle calendar/list
+document.getElementById('vCalendario').addEventListener('change', function() {
+    document.getElementById('vistaCalendario').style.display = '';
+    document.getElementById('vistaLista').style.display = 'none';
+});
+document.getElementById('vLista').addEventListener('change', function() {
+    document.getElementById('vistaCalendario').style.display = 'none';
+    document.getElementById('vistaLista').style.display = '';
+});
+</script>
 @endpush
 
 @endsection
