@@ -206,11 +206,105 @@
         .progress { border-radius: 10px; height: 8px; }
         .progress-bar { border-radius: 10px; }
 
-        /* ── SIDEBAR TOGGLE (mobile) ── */
-        @media (max-width: 768px) {
-            #sidebar { width: 0; overflow: hidden; }
-            #sidebar.show { width: var(--sidebar-width); }
+        /* ── SIDEBAR DRAWER (mobile) ── */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .5);
+            z-index: 999;
+            opacity: 0;
+            transition: opacity .25s ease;
+        }
+        @media (max-width: 991.98px) {
+            #sidebar {
+                width: var(--sidebar-width);
+                max-width: 82vw;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+            }
+            #sidebar.show { transform: translateX(0); width: var(--sidebar-width); }
             #main-content { margin-left: 0; }
+            .sidebar-overlay.show { display: block; opacity: 1; }
+            body.sidebar-open { overflow: hidden; }
+        }
+
+        /* ── RESPONSIVE TWEAKS (mobile) ── */
+        @media (max-width: 575.98px) {
+            .topbar { padding: .5rem .75rem; height: auto; min-height: 56px; gap: .4rem; flex-wrap: wrap; }
+            .topbar .page-title { font-size: .9rem; }
+            .topbar .breadcrumb { display: none; }
+            .topbar .ms-auto { gap: .35rem !important; }
+            .topbar .badge { font-size: .65rem; padding: .3rem .5rem; }
+            .content-area { padding: .85rem; }
+            .kpi-card { padding: 1rem; }
+            .kpi-card .kpi-value { font-size: 1.4rem; }
+            .kpi-card .kpi-icon { width: 40px; height: 40px; font-size: 1.1rem; }
+            .panel-header { padding: .75rem .9rem; flex-wrap: wrap; gap: .5rem; }
+            .panel-body { padding: .9rem; }
+            h1 { font-size: 1.3rem; }
+            h2 { font-size: 1.15rem; }
+            h3, h4 { font-size: 1.05rem; }
+            .btn { font-size: .85rem; }
+            .table-custom { font-size: .78rem; }
+            .table-custom thead th { padding: .55rem .6rem; }
+            .table-custom tbody td { padding: .5rem .6rem; }
+            .modal-dialog { margin: .5rem; }
+        }
+
+        /* Cualquier fila de botones/acciones se apila en pantallas chicas */
+        @media (max-width: 575.98px) {
+            .panel-header .d-flex,
+            .topbar .ms-auto,
+            .d-flex.flex-wrap { flex-wrap: wrap; }
+            .panel-header > .d-flex { width: 100%; }
+        }
+
+        /* Tablas: aunque una vista olvide envolverla en .table-responsive,
+           esto fuerza scroll horizontal en vez de romper el layout. */
+        .table-responsive { -webkit-overflow-scrolling: touch; }
+        @media (max-width: 767.98px) {
+            .content-area table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            .content-area table thead,
+            .content-area table tbody,
+            .content-area table tr {
+                display: revert;
+            }
+        }
+
+        /* Calendario: en pantallas muy chicas se compacta en vez de desbordar */
+        @media (max-width: 575.98px) {
+            .calendar-grid { gap: 2px; }
+            .calendar-cell { padding: .25rem .15rem; font-size: .65rem; border-radius: 6px; }
+            .calendar-cell .day-num { font-size: .7rem; }
+        }
+
+        /* Formularios: que los grupos en línea se apilen en vez de comprimirse */
+        @media (max-width: 575.98px) {
+            .row > [class*="col-"] { margin-bottom: .5rem; }
+        }
+
+        /* Pestañas (nav-tabs): en vez de desbordar o partirse, se desliza */
+        @media (max-width: 767.98px) {
+            .nav-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+            }
+            .nav-tabs .nav-item { flex-shrink: 0; }
+            .nav-tabs .nav-link { padding: .5rem .75rem; font-size: .85rem; }
+        }
+
+        /* Modales: ocupan casi todo el ancho y permiten alto scrollable en móvil */
+        @media (max-width: 575.98px) {
+            .modal-dialog:not(.modal-fullscreen) { max-width: calc(100% - 1rem); }
+            .modal-content { border-radius: 14px; }
+            .modal-body { max-height: 70vh; overflow-y: auto; }
         }
 
         /* ── ANIMATIONS ── */
@@ -240,6 +334,9 @@
 </head>
 <body>
 
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <!-- SIDEBAR -->
 <nav id="sidebar">
     <div class="sidebar-brand">
@@ -248,6 +345,7 @@
             <div class="brand-text">Cuadro de Turnos</div>
             <div class="brand-sub">UCI · Gestión de Turnos</div>
         </div>
+        <button type="button" class="btn-close btn-close-white ms-auto d-lg-none" aria-label="Cerrar menú" onclick="toggleSidebar()"></button>
     </div>
 
     <div class="sidebar-nav">
@@ -432,7 +530,7 @@
 <div id="main-content">
     <!-- TOP BAR -->
     <div class="topbar">
-        <button class="btn btn-sm btn-light me-3 d-md-none" onclick="toggleSidebar()">
+        <button class="btn btn-sm btn-light me-3 d-lg-none" onclick="toggleSidebar()" aria-label="Abrir menú">
             <i class="bi bi-list fs-5"></i>
         </button>
         <div>
@@ -554,9 +652,26 @@
 <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.0/dist/apexcharts.min.js"></script>
 
 <script>
-function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('show');
+function toggleSidebar(forceClose = false) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const opening = forceClose ? false : !sidebar.classList.contains('show');
+
+    sidebar.classList.toggle('show', opening);
+    overlay.classList.toggle('show', opening);
+    document.body.classList.toggle('sidebar-open', opening);
 }
+
+// Cerrar el menú al tocar un enlace (mejor respuesta táctil mientras navega)
+document.querySelectorAll('#sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', () => toggleSidebar(true));
+});
+
+// Cerrar con la tecla Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') toggleSidebar(true);
+});
+
 // Auto-dismiss alerts after 6s
 setTimeout(() => {
     document.querySelectorAll('.alert').forEach(el => {

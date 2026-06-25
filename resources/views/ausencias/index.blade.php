@@ -88,6 +88,7 @@
                 </form>
             </div>
             <div class="panel-body p-0">
+                <div class="table-responsive">
                 <table class="table table-custom mb-0">
                     <thead>
                         <tr><th>Médico</th><th>UCI</th><th>Tipo</th><th>Fechas</th><th>Días</th><th>Estado</th><th></th></tr>
@@ -131,6 +132,7 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
                 <div class="px-4 py-3">{{ $ausencias->links() }}</div>
             </div>
         </div>

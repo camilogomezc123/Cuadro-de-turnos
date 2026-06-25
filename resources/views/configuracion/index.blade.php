@@ -31,6 +31,7 @@
                 <span class="panel-title"><i class="bi bi-clock me-2 text-primary"></i>Tipos de Turno</span>
             </div>
             <div class="panel-body p-0">
+                <div class="table-responsive">
                 <table class="table table-custom mb-0">
                     <thead><tr><th>Código</th><th>Nombre</th><th>H. Diurnas</th><th>H. Nocturnas</th><th>Total</th></tr></thead>
                     <tbody>
@@ -45,6 +46,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     </div>
