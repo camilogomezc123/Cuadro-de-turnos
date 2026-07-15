@@ -684,42 +684,78 @@ setTimeout(() => {
 @stack('scripts')
 
 @auth
-@if(session('consentimiento_pendiente'))
-{{-- ── Modal de consentimiento (se muestra una vez por sesión) ── --}}
+@if(session('consentimiento_pendiente') && !auth()->user()->esMaster())
+{{-- ── Modal de consentimiento — solo usuarios no-master ── --}}
 <div class="modal fade" id="modalConsentimiento" tabindex="-1"
      data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblConsentimiento">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:540px">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 pb-0" style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
-                <div class="d-flex align-items-center gap-2 py-1">
-                    <i class="bi bi-shield-check fs-4 text-white"></i>
-                    <h5 class="modal-title text-white mb-0" id="lblConsentimiento">Aviso de uso de la plataforma</h5>
+
+            {{-- Header --}}
+            <div class="modal-header border-0 pb-2 px-4 pt-4"
+                 style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-check fs-5 text-white"></i>
+                    <h5 class="modal-title text-white mb-0 fw-semibold" id="lblConsentimiento" style="font-size:.95rem">
+                        Aviso de uso de la plataforma
+                    </h5>
                 </div>
             </div>
-            <div class="modal-body px-4 py-4">
-                <div class="bg-light rounded-3 p-3 mb-3" style="border-left:4px solid #6366f1">
-                    <p class="mb-3" style="line-height:1.7">
-                        Para continuar, confirmo que los turnos registrados en la aplicación se organizan de acuerdo con la disponibilidad que he informado libremente.
+
+            {{-- Body --}}
+            <div class="modal-body px-4 py-3">
+                {{-- Texto principal --}}
+                <div class="rounded-3 p-3 mb-3" style="background:#f0f4ff;border-left:4px solid #6366f1">
+                    <p class="mb-2" style="line-height:1.75;font-size:.9rem">
+                        Confirmo que los turnos visibles en esta aplicación se organizan con base en la disponibilidad que he reportado libremente.
                     </p>
-                    <p class="mb-0" style="line-height:1.7">
-                        Entiendo que esta programación tiene como finalidad facilitar la organización de la agenda asistencial y puede ajustarse según la disponibilidad reportada por cada profesional.
+                    <p class="mb-0" style="line-height:1.75;font-size:.9rem">
+                        Esta herramienta tiene como finalidad facilitar la planeación de la agenda asistencial, respetando la autonomía profesional y la posibilidad de actualizar la disponibilidad por los canales definidos.
                     </p>
                 </div>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" id="chkConsentimiento">
-                    <label class="form-check-label fw-semibold" for="chkConsentimiento">
-                        He leído y entiendo lo anterior
+
+                {{-- Panel de rechazo (oculto por defecto) --}}
+                <div id="panelRechazo" style="display:none">
+                    <label class="form-label fw-semibold small mb-1">
+                        <i class="bi bi-chat-left-text me-1 text-danger"></i>¿Por qué rechazas? <span class="text-muted fw-normal">(opcional)</span>
                     </label>
+                    <textarea id="motivoRechazo" class="form-control form-control-sm"
+                              rows="3" maxlength="1000"
+                              placeholder="Escribe aquí el motivo de tu rechazo…"
+                              style="resize:none;font-size:.85rem"></textarea>
                 </div>
             </div>
-            <div class="modal-footer border-0 pt-0 px-4 pb-4">
-                <button type="button" id="btnAceptarConsentimiento"
-                        class="btn btn-primary w-100 py-2 fw-semibold"
-                        disabled
-                        onclick="aceptarConsentimiento()">
-                    <i class="bi bi-check2-circle me-2"></i>Acepto y continúo
-                </button>
+
+            {{-- Footer --}}
+            <div class="modal-footer border-0 px-4 pb-4 pt-0 flex-column gap-2">
+                {{-- Botones normales --}}
+                <div id="botonesNormales" class="w-100 d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-primary flex-fill fw-semibold py-2"
+                            onclick="enviarConsentimiento('aceptar')">
+                        <i class="bi bi-check2-circle me-1"></i>Acepto y continúo
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-danger fw-semibold px-3 py-2"
+                            onclick="mostrarPanelRechazo()">
+                        <i class="bi bi-x-circle me-1"></i>Rechazar
+                    </button>
+                </div>
+                {{-- Botones de rechazo --}}
+                <div id="botonesRechazo" class="w-100 d-flex gap-2" style="display:none !important">
+                    <button type="button"
+                            class="btn btn-outline-secondary py-2 px-3"
+                            onclick="ocultarPanelRechazo()">
+                        <i class="bi bi-arrow-left me-1"></i>Volver
+                    </button>
+                    <button type="button"
+                            class="btn btn-danger flex-fill fw-semibold py-2"
+                            onclick="enviarConsentimiento('rechazar')">
+                        <i class="bi bi-x-circle me-1"></i>Confirmar rechazo
+                    </button>
+                </div>
             </div>
+
         </div>
     </div>
 </div>
@@ -727,19 +763,51 @@ setTimeout(() => {
 (function() {
     const modal = new bootstrap.Modal(document.getElementById('modalConsentimiento'));
     modal.show();
-
-    document.getElementById('chkConsentimiento').addEventListener('change', function() {
-        document.getElementById('btnAceptarConsentimiento').disabled = !this.checked;
-    });
 })();
 
-async function aceptarConsentimiento() {
+function mostrarPanelRechazo() {
+    document.getElementById('panelRechazo').style.display = '';
+    document.getElementById('botonesNormales').style.display = 'none';
+    document.getElementById('botonesRechazo').style.removeProperty('display');
+    document.getElementById('motivoRechazo').focus();
+}
+
+function ocultarPanelRechazo() {
+    document.getElementById('panelRechazo').style.display = 'none';
+    document.getElementById('botonesRechazo').style.display = 'none';
+    document.getElementById('botonesNormales').style.removeProperty('display');
+}
+
+async function enviarConsentimiento(accion) {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+
+    const url   = accion === 'aceptar'
+        ? '{{ route('consentimiento.aceptar') }}'
+        : '{{ route('consentimiento.rechazar') }}';
+
+    const body  = accion === 'rechazar'
+        ? JSON.stringify({ motivo: document.getElementById('motivoRechazo').value })
+        : null;
+
     try {
-        await fetch('{{ route('consentimiento.aceptar') }}', {
+        const resp = await fetch(url, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+            },
+            body,
         });
+        const data = await resp.json();
+
+        if (data.redirect) {
+            window.location.href = data.redirect;
+            return;
+        }
     } catch(e) { /* continuar igual */ }
+
     bootstrap.Modal.getInstance(document.getElementById('modalConsentimiento')).hide();
 }
 </script>

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use App\Models\Medico;
+use App\Models\AuditoriaSistema;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -50,8 +51,39 @@ class AuthController extends Controller
 
     public function aceptarConsentimiento(Request $request)
     {
+        $user = Auth::user();
         $request->session()->forget('consentimiento_pendiente');
+
+        AuditoriaSistema::registrar(
+            'ACEPTAR_CONSENTIMIENTO', 'consentimiento', 'User', $user->id,
+            null,
+            ['usuario' => $user->name, 'email' => $user->email, 'ip' => $request->ip(), 'fecha_hora' => now()->toDateTimeString()],
+            'Usuario aceptó el aviso de uso de la plataforma',
+            $user->name
+        );
+
         return response()->json(['ok' => true]);
+    }
+
+    public function rechazarConsentimiento(Request $request)
+    {
+        $request->validate(['motivo' => 'nullable|string|max:1000']);
+        $user   = Auth::user();
+        $motivo = trim($request->motivo ?? '');
+
+        AuditoriaSistema::registrar(
+            'RECHAZAR_CONSENTIMIENTO', 'consentimiento', 'User', $user->id,
+            null,
+            ['usuario' => $user->name, 'email' => $user->email, 'ip' => $request->ip(), 'fecha_hora' => now()->toDateTimeString(), 'motivo' => $motivo ?: 'No especificado'],
+            'Usuario rechazó el aviso de uso de la plataforma' . ($motivo ? ": {$motivo}" : ''),
+            $user->name
+        );
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['ok' => true, 'redirect' => route('login')]);
     }
 
     // ── Gestión de usuarios (solo master) ────────────────────────

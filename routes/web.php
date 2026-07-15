@@ -30,7 +30,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login',  [AuthController::class, 'loginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout',[AuthController::class, 'logout'])->name('logout');
-Route::middleware('auth')->post('/consentimiento', [AuthController::class, 'aceptarConsentimiento'])->name('consentimiento.aceptar');
+Route::middleware('auth')->group(function () {
+    Route::post('/consentimiento/aceptar',  [AuthController::class, 'aceptarConsentimiento']) ->name('consentimiento.aceptar');
+    Route::post('/consentimiento/rechazar', [AuthController::class, 'rechazarConsentimiento'])->name('consentimiento.rechazar');
+});
 
 // ── Portal médico ───────────────────────────────────────────────
 Route::middleware('auth')->prefix('mi-portal')->name('medico.')->group(function () {
