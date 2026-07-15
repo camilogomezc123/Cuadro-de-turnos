@@ -682,5 +682,69 @@ setTimeout(() => {
 </script>
 
 @stack('scripts')
+
+@auth
+@if(session('consentimiento_pendiente'))
+{{-- ── Modal de consentimiento (se muestra una vez por sesión) ── --}}
+<div class="modal fade" id="modalConsentimiento" tabindex="-1"
+     data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblConsentimiento">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0" style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
+                <div class="d-flex align-items-center gap-2 py-1">
+                    <i class="bi bi-shield-check fs-4 text-white"></i>
+                    <h5 class="modal-title text-white mb-0" id="lblConsentimiento">Aviso de uso de la plataforma</h5>
+                </div>
+            </div>
+            <div class="modal-body px-4 py-4">
+                <div class="bg-light rounded-3 p-3 mb-3" style="border-left:4px solid #6366f1">
+                    <p class="mb-3" style="line-height:1.7">
+                        Para continuar, confirmo que los turnos registrados en la aplicación se organizan de acuerdo con la disponibilidad que he informado libremente.
+                    </p>
+                    <p class="mb-0" style="line-height:1.7">
+                        Entiendo que esta programación tiene como finalidad facilitar la organización de la agenda asistencial y puede ajustarse según la disponibilidad reportada por cada profesional.
+                    </p>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" id="chkConsentimiento">
+                    <label class="form-check-label fw-semibold" for="chkConsentimiento">
+                        He leído y entiendo lo anterior
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                <button type="button" id="btnAceptarConsentimiento"
+                        class="btn btn-primary w-100 py-2 fw-semibold"
+                        disabled
+                        onclick="aceptarConsentimiento()">
+                    <i class="bi bi-check2-circle me-2"></i>Acepto y continúo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    const modal = new bootstrap.Modal(document.getElementById('modalConsentimiento'));
+    modal.show();
+
+    document.getElementById('chkConsentimiento').addEventListener('change', function() {
+        document.getElementById('btnAceptarConsentimiento').disabled = !this.checked;
+    });
+})();
+
+async function aceptarConsentimiento() {
+    try {
+        await fetch('{{ route('consentimiento.aceptar') }}', {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+        });
+    } catch(e) { /* continuar igual */ }
+    bootstrap.Modal.getInstance(document.getElementById('modalConsentimiento')).hide();
+}
+</script>
+@endif
+@endauth
+
 </body>
 </html>

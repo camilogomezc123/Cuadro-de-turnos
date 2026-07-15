@@ -24,6 +24,7 @@ class AuthController extends Controller
 
         if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();
+            $request->session()->put('consentimiento_pendiente', true);
             $user = Auth::user();
 
             // Médicos van directo a su portal personal
@@ -45,6 +46,12 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         return redirect()->route('login');
+    }
+
+    public function aceptarConsentimiento(Request $request)
+    {
+        $request->session()->forget('consentimiento_pendiente');
+        return response()->json(['ok' => true]);
     }
 
     // ── Gestión de usuarios (solo master) ────────────────────────
