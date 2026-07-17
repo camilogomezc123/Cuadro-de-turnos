@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Medico;
 use App\Models\TurnoMedico;
 use App\Models\Uci;
+use App\Models\HorasAutorizacionExtra;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class MedicoController extends Controller
@@ -98,6 +100,43 @@ class MedicoController extends Controller
 
         $nombresMeses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-        return view('medicos.show', compact('medico','turnos','indicador','historial','ucisDelMedico','mes','anio','nombresMeses'));
+        $autorizacionHoras = HorasAutorizacionExtra::where('medico_id', $medico->id)
+            ->where('mes', $mes)
+            ->where('anio', $anio)
+            ->with('autorizadoPor')
+            ->first();
+
+        return view('medicos.show', compact(
+            'medico','turnos','indicador','historial','ucisDelMedico',
+            'mes','anio','nombresMeses','autorizacionHoras'
+        ));
+    }
+
+    public function autorizarHoras(Request $request, Medico $medico)
+    {
+        $request->validate([
+            'mes'  => 'required|integer|between:1,12',
+            'anio' => 'required|integer|min:2020|max:2040',
+        ]);
+
+        HorasAutorizacionExtra::updateOrCreate(
+            ['medico_id' => $medico->id, 'mes' => $request->mes, 'anio' => $request->anio],
+            ['autorizado_por_user_id' => Auth::id()]
+        );
+
+        return back();
+    }
+
+    public function revocarHoras(Request $request, Medico $medico)
+    {
+        $mes  = (int)($request->mes  ?? now()->month);
+        $anio = (int)($request->anio ?? now()->year);
+
+        HorasAutorizacionExtra::where('medico_id', $medico->id)
+            ->where('mes',  $mes)
+            ->where('anio', $anio)
+            ->delete();
+
+        return back();
     }
 }

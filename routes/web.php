@@ -188,7 +188,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/medicos/duplicados',        [MedicoDuplicadoController::class, 'index'])        ->name('medicos.duplicados.index');
         Route::post('/medicos/duplicados/fusionar',      [MedicoDuplicadoController::class, 'fusionar'])     ->name('medicos.duplicados.fusionar');
         Route::post('/medicos/duplicados/fusionar-todos',[MedicoDuplicadoController::class, 'fusionarTodos'])->name('medicos.duplicados.fusionar-todos');
-        Route::get('/medicos/{medico}',         [MedicoController::class, 'show']) ->name('medicos.show');
+        Route::get('/medicos/{medico}',          [MedicoController::class, 'show'])           ->name('medicos.show');
+        Route::post('/medicos/{medico}/autorizar-horas', [MedicoController::class, 'autorizarHoras'])->name('medicos.autorizar-horas');
+        Route::delete('/medicos/{medico}/revocar-horas', [MedicoController::class, 'revocarHoras'])  ->name('medicos.revocar-horas');
 
         // Usuarios
         Route::get('/usuarios',                       [AuthController::class, 'usuarios'])           ->name('usuarios.index');

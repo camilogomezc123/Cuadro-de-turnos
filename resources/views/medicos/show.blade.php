@@ -149,4 +149,71 @@
     </div>
 </div>
 @endif
+
+{{-- ── Panel límite de horas (visible solo para master) ── --}}
+<div class="panel mt-3">
+    <div class="panel-header">
+        <span class="panel-title">
+            <i class="bi bi-shield-lock me-2 {{ $indicador['total_horas'] >= 220 ? 'text-danger' : 'text-secondary' }}"></i>
+            Límite de horas — {{ $nombresMeses[$mes-1] }} {{ $anio }}
+        </span>
+        @if($autorizacionHoras)
+            <span class="badge bg-warning text-dark">
+                <i class="bi bi-unlock-fill me-1"></i>Autorización activa
+            </span>
+        @elseif($indicador['total_horas'] >= 220)
+            <span class="badge bg-danger">
+                <i class="bi bi-x-circle me-1"></i>Límite alcanzado
+            </span>
+        @else
+            <span class="badge bg-success-subtle text-success">
+                {{ number_format($indicador['total_horas'], 0) }} / 220h
+            </span>
+        @endif
+    </div>
+    <div class="panel-body">
+        {{-- Barra de progreso --}}
+        @php $pct = min(100, ($indicador['total_horas'] / 220) * 100); @endphp
+        <div class="progress mb-3" style="height:10px;border-radius:6px">
+            <div class="progress-bar {{ $pct >= 100 ? 'bg-danger' : ($pct >= 85 ? 'bg-warning' : 'bg-success') }}"
+                 style="width:{{ $pct }}%;transition:width .4s"></div>
+        </div>
+        <p class="small text-muted mb-3">
+            {{ number_format($indicador['total_horas'], 0) }} h registradas de 220h permitidas.
+            @if($autorizacionHoras)
+                Autorización concedida por <strong>{{ $autorizacionHoras->autorizadoPor?->name ?? '—' }}</strong>
+                el {{ $autorizacionHoras->created_at?->format('d/m/Y H:i') }}.
+            @endif
+        </p>
+
+        @auth
+        @if(auth()->user()->esMaster())
+        @if($autorizacionHoras)
+            {{-- Revocar autorización --}}
+            <form method="POST"
+                  action="{{ route('medicos.revocar-horas', $medico) }}"
+                  onsubmit="return confirm('¿Revocar la autorización de horas extra?')">
+                @csrf @method('DELETE')
+                <input type="hidden" name="mes"  value="{{ $mes }}">
+                <input type="hidden" name="anio" value="{{ $anio }}">
+                <button class="btn btn-sm btn-outline-warning">
+                    <i class="bi bi-lock me-1"></i>Revocar autorización
+                </button>
+            </form>
+        @else
+            {{-- Autorizar --}}
+            <form method="POST" action="{{ route('medicos.autorizar-horas', $medico) }}">
+                @csrf
+                <input type="hidden" name="mes"  value="{{ $mes }}">
+                <input type="hidden" name="anio" value="{{ $anio }}">
+                <button class="btn btn-sm btn-warning fw-semibold">
+                    <i class="bi bi-unlock me-1"></i>Autorizar superar 220h este mes
+                </button>
+            </form>
+        @endif
+        @endif
+        @endauth
+    </div>
+</div>
+
 @endsection
