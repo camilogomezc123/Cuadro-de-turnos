@@ -168,7 +168,7 @@ class CambioTurnoController extends Controller
 
         $tipo = $data['tipo_movimiento'] ?? 'cambio_directo';
 
-        // ── Verificar límite 220h para el receptor ─────────────────
+        // ── Verificar límite 216h para el receptor ─────────────────
         $archivoId     = $turnoOrigen->archivo_id;
         $compOfrec     = $componente ?: $turnoOrigen->codigo_turno;
         $horasGanadas  = TurnoService::horasPorCodigo($compOfrec)['total'] ?? 0;
@@ -178,7 +178,7 @@ class CambioTurnoController extends Controller
             $horasPerdidas = $tDest?->horas_total ?? 0;
         }
         $horasActReceptor = $this->horasMedicoEnArchivo((int)$data['medico_receptor_id'], $archivoId);
-        if (($horasActReceptor + $horasGanadas - $horasPerdidas) > 220
+        if (($horasActReceptor + $horasGanadas - $horasPerdidas) > 216
             && !$this->tieneAutorizacionHorasExtra((int)$data['medico_receptor_id'], $archivoId)) {
             return back();
         }
@@ -349,10 +349,10 @@ class CambioTurnoController extends Controller
             $codigoReceptorNuevo  = self::mergeComponente($codigoReceptorActual, $comp);
             $horasReceptor        = TurnoService::horasPorCodigo($codigoReceptorNuevo);
 
-            // ── Check 220h receptor ────────────────────────────────
+            // ── Check 216h receptor ────────────────────────────────
             $horasRecTotal = $this->horasMedicoEnArchivo($cambio->medico_receptor_id, $tOrigen->archivo_id);
             $deltaRec      = ($horasReceptor['total'] ?? 0) - ($tReceptor?->horas_total ?? 0);
-            if (($horasRecTotal + $deltaRec) > 220
+            if (($horasRecTotal + $deltaRec) > 216
                 && !$this->tieneAutorizacionHorasExtra($cambio->medico_receptor_id, $tOrigen->archivo_id)) {
                 return back();
             }
@@ -421,17 +421,17 @@ class CambioTurnoController extends Controller
                 $horasA = TurnoService::horasPorCodigo($codigoB); // solicitante recibirá codigoB
                 $horasB = TurnoService::horasPorCodigo($codigoA); // receptor recibirá codigoA
 
-                // ── Check 220h solicitante ─────────────────────────
+                // ── Check 216h solicitante ─────────────────────────
                 $hSolAct = $this->horasMedicoEnArchivo($tOrigen->medico_id, $tOrigen->archivo_id);
                 $deltaSol = ($horasA['total'] ?? 0) - ($tOrigen->horas_total ?? 0);
-                if (($hSolAct + $deltaSol) > 220
+                if (($hSolAct + $deltaSol) > 216
                     && !$this->tieneAutorizacionHorasExtra($tOrigen->medico_id, $tOrigen->archivo_id)) {
                     return back();
                 }
-                // ── Check 220h receptor ────────────────────────────
+                // ── Check 216h receptor ────────────────────────────
                 $hRecAct = $this->horasMedicoEnArchivo($tDestino->medico_id, $tDestino->archivo_id);
                 $deltaRec = ($horasB['total'] ?? 0) - ($tDestino->horas_total ?? 0);
-                if (($hRecAct + $deltaRec) > 220
+                if (($hRecAct + $deltaRec) > 216
                     && !$this->tieneAutorizacionHorasExtra($tDestino->medico_id, $tDestino->archivo_id)) {
                     return back();
                 }
