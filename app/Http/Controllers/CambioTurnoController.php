@@ -168,14 +168,6 @@ class CambioTurnoController extends Controller
 
         $tipo = $data['tipo_movimiento'] ?? 'cambio_directo';
 
-        // ── Solo master puede mover turnos T o N ───────────────────
-        if (!$user->esMaster()) {
-            $codigoCheck = $componente ?: strtoupper($turnoOrigen->codigo_turno);
-            if (in_array($codigoCheck, ['T', 'N', 'MT', 'MTN', 'MN'])) {
-                return back();
-            }
-        }
-
         // ── Verificar límite 216h para el receptor ─────────────────
         $archivoId     = $turnoOrigen->archivo_id;
         $compOfrec     = $componente ?: $turnoOrigen->codigo_turno;
