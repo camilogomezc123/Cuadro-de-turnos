@@ -153,6 +153,10 @@ class MedicoPortalController extends Controller
             return back()->with('error', 'No se puede ofrecer un turno pasado.');
         }
 
+        if (!Auth::user()->esMaster() && in_array(strtoupper($turno->codigo_turno), ['T', 'N', 'MT', 'MTN', 'MN'])) {
+            return back();
+        }
+
         DB::transaction(function () use ($turno, $medico, $request) {
             $turno->update(['estado_turno' => 'ofrecido']);
 
@@ -220,6 +224,10 @@ class MedicoPortalController extends Controller
 
         if ($turnoOrigen->medico_id !== $medico->id) {
             return back()->with('error', 'Ese turno no te pertenece.');
+        }
+
+        if (!Auth::user()->esMaster() && in_array(strtoupper($turnoOrigen->codigo_turno), ['T', 'N', 'MT', 'MTN', 'MN'])) {
+            return back();
         }
 
         $existe = SolicitudCambioTurno::where('turno_origen_id', $turnoOrigen->id)
