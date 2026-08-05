@@ -7,6 +7,7 @@ use App\Models\TurnoMedico;
 use App\Models\Medico;
 use App\Models\AuditoriaSistema;
 use App\Services\HoraConsolidadoService;
+use App\Services\TurnoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -95,8 +96,8 @@ class NovedadController extends Controller
                         'codigo_turno'    => $codigoReem,
                         'horas_total'     => $horasReem,
                         'horas_reconocidas'=> $horasReem,
-                        'horas_diurnas'   => in_array($codigoReem,['M','T','MT','MTN']) ? min($horasReem,12) : 0,
-                        'horas_nocturnas' => in_array($codigoReem,['N','MTN','MN']) ? 12 : 0,
+                        'horas_diurnas'   => TurnoService::horasPorCodigo($codigoReem)['diurnas'],
+                        'horas_nocturnas' => TurnoService::horasPorCodigo($codigoReem)['nocturnas'],
                         'es_fin_semana'   => $turno->es_fin_semana,
                         'es_domingo'      => $turno->es_domingo,
                         'estado_turno'    => 'reemplazado',

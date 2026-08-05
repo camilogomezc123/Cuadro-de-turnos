@@ -44,7 +44,7 @@ class UciController extends Controller
                 DB::raw('SUM(CASE WHEN codigo_turno = "N" OR codigo_turno LIKE "%N%" THEN 1 ELSE 0 END) as turnos_nocturnos'),
             )
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy('uci_id')
             ->get()
             ->keyBy('uci_id');
@@ -52,7 +52,7 @@ class UciController extends Controller
         // Cobertura: cuántos días del mes tuvo al menos un médico de turno
         $coberturaPorUci = TurnoMedico::select('uci_id', DB::raw('COUNT(DISTINCT fecha) as dias_cubiertos'))
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy('uci_id')
             ->get()->keyBy('uci_id');
 
@@ -77,7 +77,7 @@ class UciController extends Controller
             )
             ->where('uci_id', $uci->id)
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->first();
 
         // Médicos con sus horas en esta UCI este mes
@@ -87,11 +87,11 @@ class UciController extends Controller
                 DB::raw('SUM(horas_nocturnas) as horas_nocturnas'),
                 DB::raw('COUNT(*) as total_turnos'),
                 DB::raw('SUM(CASE WHEN es_fin_semana = 1 THEN 1 ELSE 0 END) as fines_semana'),
-                DB::raw('SUM(CASE WHEN codigo_turno IN ("N","MTN","MN") THEN 1 ELSE 0 END) as turnos_nocturnos'),
+                DB::raw('SUM(CASE WHEN codigo_turno IN ("N","TN","MTN","MN") THEN 1 ELSE 0 END) as turnos_nocturnos'),
             )
             ->where('uci_id', $uci->id)
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy('medico_id')
             ->with('medico')
             ->orderByDesc('total_horas')
@@ -105,7 +105,7 @@ class UciController extends Controller
                 DB::raw('SUM(horas_total) as horas'),
             )
             ->where('uci_id', $uci->id)
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy(DB::raw('YEAR(fecha)'), DB::raw('MONTH(fecha)'))
             ->orderByDesc(DB::raw('YEAR(fecha)'))->orderByDesc(DB::raw('MONTH(fecha)'))
             ->limit(12)
@@ -115,7 +115,7 @@ class UciController extends Controller
         $distribucion = TurnoMedico::select('codigo_turno', DB::raw('COUNT(*) as cnt'))
             ->where('uci_id', $uci->id)
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy('codigo_turno')
             ->get()->keyBy('codigo_turno');
 

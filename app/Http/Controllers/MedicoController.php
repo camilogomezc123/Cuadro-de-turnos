@@ -41,7 +41,7 @@ class MedicoController extends Controller
                 DB::raw('COUNT(*) as total_turnos'),
             )
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->when($uciId, fn($q) => $q->where('uci_id', $uciId))
             ->groupBy('medico_id')
             ->get()->keyBy('medico_id');
@@ -84,7 +84,7 @@ class MedicoController extends Controller
                 'uci_id',
             )
             ->where('medico_id', $medico->id)
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy(DB::raw('YEAR(fecha)'), DB::raw('MONTH(fecha)'), 'uci_id')
             ->with('uci')
             ->orderByDesc(DB::raw('YEAR(fecha)'))->orderByDesc(DB::raw('MONTH(fecha)'))
@@ -95,7 +95,7 @@ class MedicoController extends Controller
         $ucisDelMedico = TurnoMedico::select('uci_id', DB::raw('SUM(horas_total) as horas'))
             ->where('medico_id', $medico->id)
             ->whereBetween('fecha', [$ini, $fin])
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->groupBy('uci_id')->with('uci')->get();
 
         $nombresMeses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];

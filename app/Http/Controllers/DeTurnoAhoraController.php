@@ -165,7 +165,7 @@ class DeTurnoAhoraController extends Controller
         $r = self::RANGOS[$codigo] ?? null;
         if (!$r) return false;
 
-        if (in_array($codigo, ['N', 'MTN', 'MN'])) {
+        if (in_array($codigo, ['N', 'TN', 'MTN', 'MN'])) {
             return $minutos >= $r['ini'] || $minutos < 420;
         }
         return $minutos >= $r['ini'] && $minutos < $r['fin'];

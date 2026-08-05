@@ -148,6 +148,7 @@
         .badge-N    { background: #EDE7F6; color: #4527A0; }
         .badge-MTN  { background: #880E4F; color: #fff; }
         .badge-MN   { background: #FCE4EC; color: #880E4F; }
+        .badge-TN   { background: #1E1B4B; color: #C4B5FD; }
         .badge-VAC  { background: #E0F7FA; color: #006064; }
         .badge-PER  { background: #FFFDE7; color: #F57F17; }
         .badge-INC  { background: #FFEBEE; color: #C62828; }

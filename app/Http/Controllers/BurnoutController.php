@@ -313,8 +313,8 @@ class BurnoutController extends Controller
             $fin = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
 
             $turnosMes  = TurnoMedico::where('medico_id', $medico->id)->whereBetween('fecha', [$ini, $fin])->get();
-            $horasMes   = $turnosMes->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->sum('horas_total');
-            $nocturnos  = $turnosMes->whereIn('codigo_turno',['N','MTN','MN'])->count();
+            $horasMes   = $turnosMes->whereIn('codigo_turno',['M','T','MT','N','TN','MTN','MN'])->sum('horas_total');
+            $nocturnos  = $turnosMes->whereIn('codigo_turno',['N','TN','MTN','MN'])->count();
             $supera200  = $horasMes > 200;
             $diaLargo   = $turnosMes->whereIn('codigo_turno',['MTN','MN'])->where('es_fin_semana', false)->count() > 0;
 

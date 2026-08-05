@@ -10,6 +10,7 @@ use App\Models\TurnoMedico;
 use App\Models\ArchivoCargado;
 use App\Models\AuditoriaSistema;
 use App\Services\HoraConsolidadoService;
+use App\Services\TurnoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +20,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 class SecuenciaUciController extends Controller
 {
-    const CODIGOS_VALIDOS = ['M','T','MT','N','MTN','MN','PER','INC','LIBRE',''];
+    const CODIGOS_VALIDOS = ['M','T','MT','N','TN','MTN','MN','PER','INC','LIBRE',''];
 
     public function index(Request $request)
     {
@@ -422,7 +423,7 @@ class SecuenciaUciController extends Controller
                 ->where('uci_id', $uci->id)
                 ->delete();
 
-            $horasMap = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'MTN'=>24,'MN'=>18,
+            $horasMap = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'TN'=>18,'MTN'=>24,'MN'=>18,
                          'VAC'=>0,'PER'=>0,'INC'=>0,'LIBRE'=>0,''=>0];
 
             foreach ($parsed['doctores'] as $doc) {
@@ -456,8 +457,8 @@ class SecuenciaUciController extends Controller
                         'dia_numero'      => $dia,
                         'dia_semana'      => $diaNom,
                         'codigo_turno'    => $codigo,
-                        'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
-                        'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                        'horas_diurnas'   => TurnoService::horasPorCodigo($codigo)['diurnas'],
+                        'horas_nocturnas' => TurnoService::horasPorCodigo($codigo)['nocturnas'],
                         'horas_total'     => $horas,
                         'es_fin_semana'   => $esFinde,
                         'es_domingo'      => ($dow === 0),
@@ -503,7 +504,7 @@ class SecuenciaUciController extends Controller
         $maxRow = $sheet->getHighestDataRow();
         $maxCol = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
 
-        $codigosValidos = ['M','T','MT','N','MTN','MN','VAC','PER','INC','LIBRE'];
+        $codigosValidos = ['M','T','MT','N','TN','MTN','MN','VAC','PER','INC','LIBRE'];
 
         // ── Detectar fila de encabezado de días y columna de nombres ──
         // Buscamos una fila que tenga números 1…N secuenciales
@@ -644,7 +645,7 @@ class SecuenciaUciController extends Controller
         }
 
         // Parsear médicos
-        $codigosValidos = ['M','T','MT','N','MTN','MN','VAC','PER','INC','LIBRE'];
+        $codigosValidos = ['M','T','MT','N','TN','MTN','MN','VAC','PER','INC','LIBRE'];
         $doctores = [];
 
         for ($row = $headerRow + 1; $row <= $maxRow; $row++) {
@@ -798,7 +799,7 @@ class SecuenciaUciController extends Controller
                         $dias   = $semanas[$semanaPatron] ?? $semanas[1] ?? [];
                         $codigo = strtoupper($dias[$idx] ?? '');
                         if ($codigo === '') continue;
-                        $horas  = TurnoMedico::horasPorCodigo($codigo);
+                        $horasData = TurnoService::horasPorCodigo($codigo);
 
                         $filas[] = [
                             'archivo_id'      => $archivo->id,
@@ -808,9 +809,9 @@ class SecuenciaUciController extends Controller
                             'dia_numero'      => $d,
                             'dia_semana'      => $diasNombreShort,
                             'codigo_turno'    => $codigo,
-                            'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
-                            'horas_nocturnas' => in_array($codigo,['N','MTN','MN']) ? 12:0,
-                            'horas_total'     => $horas,
+                            'horas_diurnas'   => $horasData['diurnas'],
+                            'horas_nocturnas' => $horasData['nocturnas'],
+                            'horas_total'     => $horasData['total'],
                             'es_fin_semana'   => $esFinde,
                             'es_domingo'      => ($dow === 0),
                             'estado_turno'    => 'programado',
@@ -824,8 +825,8 @@ class SecuenciaUciController extends Controller
                     // Legado: días hábiles con patrón fijo
                     foreach ($patron4 as $medicoId => $semanas) {
                         $dias   = $semanas[1] ?? [];
-                        $codigo = strtoupper($dias[$idx] ?? '');
-                        $horas  = TurnoMedico::horasPorCodigo($codigo);
+                        $codigo    = strtoupper($dias[$idx] ?? '');
+                        $horasData = TurnoService::horasPorCodigo($codigo);
 
                         $filas[] = [
                             'archivo_id'      => $archivo->id,
@@ -835,9 +836,9 @@ class SecuenciaUciController extends Controller
                             'dia_numero'      => $d,
                             'dia_semana'      => $diasNombreShort,
                             'codigo_turno'    => $codigo,
-                            'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
-                            'horas_nocturnas' => in_array($codigo,['N','MTN','MN']) ? 12:0,
-                            'horas_total'     => $horas,
+                            'horas_diurnas'   => $horasData['diurnas'],
+                            'horas_nocturnas' => $horasData['nocturnas'],
+                            'horas_total'     => $horasData['total'],
                             'es_fin_semana'   => false,
                             'es_domingo'      => false,
                             'estado_turno'    => 'programado',
@@ -853,8 +854,8 @@ class SecuenciaUciController extends Controller
                     $slotMedicos = $finSemanaMap[$semSlot][$idx] ?? [];
 
                     foreach ($slotMedicos as $slot) {
-                        $codigo = strtoupper($slot['codigo'] ?? '');
-                        $horas  = TurnoMedico::horasPorCodigo($codigo);
+                        $codigo    = strtoupper($slot['codigo'] ?? '');
+                        $horasData = TurnoService::horasPorCodigo($codigo);
 
                         $filas[] = [
                             'archivo_id'      => $archivo->id,
@@ -864,9 +865,9 @@ class SecuenciaUciController extends Controller
                             'dia_numero'      => $d,
                             'dia_semana'      => $diasNombreShort,
                             'codigo_turno'    => $codigo,
-                            'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
-                            'horas_nocturnas' => in_array($codigo,['N','MTN','MN']) ? 12:0,
-                            'horas_total'     => $horas,
+                            'horas_diurnas'   => $horasData['diurnas'],
+                            'horas_nocturnas' => $horasData['nocturnas'],
+                            'horas_total'     => $horasData['total'],
                             'es_fin_semana'   => true,
                             'es_domingo'      => ($dow === 0),
                             'estado_turno'    => 'programado',

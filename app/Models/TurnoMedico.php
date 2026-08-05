@@ -40,7 +40,7 @@ class TurnoMedico extends Model
     // Código de turno "seleccionable" (excluye VAC de nuevas asignaciones)
     public static function codigosActivos(): array
     {
-        return ['M', 'T', 'MT', 'N', 'MTN', 'MN', 'PER', 'INC', 'LIBRE'];
+        return ['M', 'T', 'MT', 'N', 'TN', 'MTN', 'MN', 'PER', 'INC', 'LIBRE'];
     }
 
     public static function horasPorCodigo(string $codigo): float
@@ -50,6 +50,7 @@ class TurnoMedico extends Model
             'T'    => 6,
             'MT'   => 12,
             'N'    => 12,
+            'TN'   => 18,
             'MTN'  => 24,
             'MN'   => 18,
             default => 0,

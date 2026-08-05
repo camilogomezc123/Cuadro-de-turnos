@@ -120,6 +120,7 @@
 .badge-N   { background:#1e1b4b; color:#e0e7ff; }
 .badge-MTN { background:#7c3aed; color:#ede9fe; }
 .badge-MN  { background:#4c1d95; color:#ede9fe; }
+.badge-TN  { background:#1e1b4b; color:#c4b5fd; }
 .badge-PER { background:#fef9c3; color:#713f12; }
 .badge-INC { background:#fee2e2; color:#991b1b; }
 .badge-LIBRE{ background:#f1f5f9; color:#475569; }
@@ -447,7 +448,7 @@
                                 <select name="patron[{{ $sem }}][{{ $di }}]"
                                         class="form-select form-select-sm text-center">
                                     <option value="">—</option>
-                                    @foreach(['M','T','MT','N','MTN','MN','PER','INC','LIBRE'] as $c)
+                                    @foreach(['M','T','MT','N','TN','MTN','MN','PER','INC','LIBRE'] as $c)
                                         <option value="{{ $c }}">{{ $c }}</option>
                                     @endforeach
                                 </select>
@@ -475,7 +476,7 @@
 @push('scripts')
 <script>
 const MEDICOS  = @json($medicos->map(fn($m)=>['id'=>$m->id,'nombre'=>$m->nombre_completo]));
-const CODIGOS  = ['','M','T','MT','N','MTN','MN','PER','INC','LIBRE'];
+const CODIGOS  = ['','M','T','MT','N','TN','MTN','MN','PER','INC','LIBRE'];
 const CSRF_SEQ = '{{ csrf_token() }}';
 const DIAS_NOM = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 

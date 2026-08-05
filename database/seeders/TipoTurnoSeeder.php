@@ -91,6 +91,22 @@ class TipoTurnoSeeder extends Seeder
                 'solo_finde'     => true,         // solo sábado y domingo
             ],
             [
+                'codigo'         => 'TN',
+                'nombre'         => 'Tarde-Noche',
+                'hora_inicio'    => '13:00:00',
+                'hora_fin'       => '07:00:00',
+                'horas_diurnas'  => 6.0,
+                'horas_nocturnas'=> 12.0,
+                'horas_total'    => 18.0,
+                'color_hex'      => '#1E1B4B',
+                'color_clase'    => 'badge-TN',
+                'es_ausencia'    => false,
+                'cubre_manana'   => false,
+                'cubre_tarde'    => true,
+                'cubre_noche'    => true,
+                'solo_finde'     => false,
+            ],
+            [
                 'codigo'         => 'MN',
                 'nombre'         => 'Mañana-Noche',
                 'hora_inicio'    => '07:00:00',

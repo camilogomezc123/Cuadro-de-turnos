@@ -33,7 +33,7 @@ class CambioTurnoController extends Controller
         if ($user->medico_id && $archivo) {
             $turnos = TurnoMedico::where('medico_id', $user->medico_id)
                 ->where('archivo_id', $archivoId)
-                ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+                ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
                 ->orderBy('fecha')
                 ->with('medico')
                 ->get();
@@ -69,7 +69,7 @@ class CambioTurnoController extends Controller
         if ($user->medico_id && $archivo) {
             $misTurnosDisponibles = TurnoMedico::where('medico_id', $user->medico_id)
                 ->where('archivo_id', $archivoId)
-                ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+                ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
                 ->orderBy('fecha')->get();
         }
 
@@ -92,7 +92,7 @@ class CambioTurnoController extends Controller
 
         $turnos = TurnoMedico::where('medico_id', $user->medico_id)
             ->where('archivo_id', $archivoId)
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->orderBy('fecha')
             ->get(['id','fecha','codigo_turno','uci_id']);
 
@@ -118,7 +118,7 @@ class CambioTurnoController extends Controller
 
         $turnos = TurnoMedico::where('medico_id', $medicoId)
             ->where('archivo_id', $archivoId)
-            ->whereIn('codigo_turno', ['M','T','MT','N','MTN','MN'])
+            ->whereIn('codigo_turno', ['M','T','MT','N','TN','MTN','MN'])
             ->orderBy('fecha')
             ->get(['id','fecha','codigo_turno']);
 
@@ -507,6 +507,11 @@ class CambioTurnoController extends Controller
                 ['valor'=>'M',   'label'=>'Solo M — mañana (6h)'],
                 ['valor'=>'T',   'label'=>'Solo T — tarde (6h)'],
             ],
+            'TN'  => [
+                ['valor'=>'TN',  'label'=>'TN completo — tarde + noche (18h)'],
+                ['valor'=>'T',   'label'=>'Solo T — tarde (6h)'],
+                ['valor'=>'N',   'label'=>'Solo N — noche (12h)'],
+            ],
             'MTN' => [
                 ['valor'=>'MTN', 'label'=>'MTN completo — todo el día (24h)'],
                 ['valor'=>'MT',  'label'=>'MT — mañana + tarde (12h)'],
@@ -530,6 +535,7 @@ class CambioTurnoController extends Controller
     {
         $tabla = [
             'MT'  => ['M'=>'T',   'T'=>'M',    'MT'=>'LIBRE'],
+            'TN'  => ['T'=>'N',   'N'=>'T',    'TN'=>'LIBRE'],
             'MTN' => ['T'=>'MN',  'N'=>'MT',   'MT'=>'N',   'MTN'=>'LIBRE'],
             'MN'  => ['M'=>'N',   'N'=>'M',    'MN'=>'LIBRE'],
             'M'   => ['M'=>'LIBRE'],
@@ -567,7 +573,7 @@ class CambioTurnoController extends Controller
         $comps = [
             'LIBRE'=>[], ''=>[],
             'M'=>['M'], 'T'=>['T'], 'N'=>['N'],
-            'MT'=>['M','T'], 'MTN'=>['M','T','N'], 'MN'=>['M','N'],
+            'TN'=>['T','N'], 'MT'=>['M','T'], 'MTN'=>['M','T','N'], 'MN'=>['M','N'],
         ];
         $todas = array_unique(array_merge(
             $comps[strtoupper($existente)] ?? [],
@@ -579,8 +585,7 @@ class CambioTurnoController extends Controller
         // Mapa de combinaciones posibles
         $mapa = [
             'M'=>'M','T'=>'T','N'=>'N',
-            'MT'=>'MT','MN'=>'MN','MTN'=>'MTN',
-            'TN'=>'MTN',  // T+N no existe → MTN
+            'TN'=>'TN','MT'=>'MT','MN'=>'MN','MTN'=>'MTN',
             'MNT'=>'MTN', // variante de ordenamiento
         ];
         return $mapa[$clave] ?? ($nuevo ?: 'LIBRE');

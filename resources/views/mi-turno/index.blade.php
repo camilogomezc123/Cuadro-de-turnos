@@ -61,6 +61,7 @@
 .cb-N    { background:#1e1b4b; color:#e0e7ff; }
 .cb-MTN  { background:#7c3aed; color:#ede9fe; }
 .cb-MN   { background:#4c1d95; color:#ede9fe; }
+.cb-TN   { background:#1e1b4b; color:#c4b5fd; }
 .cb-PER  { background:#fef9c3; color:#713f12; }
 .cb-INC  { background:#fee2e2; color:#991b1b; }
 .cb-LIBRE{ background:#f1f5f9; color:#94a3b8; }
@@ -150,7 +151,7 @@
 <div class="panel mb-3">
     <h6 class="fw-semibold mb-2" style="color:#1a2340;font-size:.87rem">Distribución</h6>
     @php
-        $cbCls = ['M'=>'cb-M','T'=>'cb-T','MT'=>'cb-MT','N'=>'cb-N','MTN'=>'cb-MTN','MN'=>'cb-MN','PER'=>'cb-PER','INC'=>'cb-INC','LIBRE'=>'cb-LIBRE'];
+        $cbCls = ['M'=>'cb-M','T'=>'cb-T','MT'=>'cb-MT','N'=>'cb-N','TN'=>'cb-TN','MTN'=>'cb-MTN','MN'=>'cb-MN','PER'=>'cb-PER','INC'=>'cb-INC','LIBRE'=>'cb-LIBRE'];
     @endphp
     <div class="d-flex flex-wrap gap-2">
         @foreach($resumen['por_codigo'] as $codigo => $cnt)

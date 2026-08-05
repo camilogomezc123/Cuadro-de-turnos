@@ -196,7 +196,7 @@ class AlertService
             $fecha = Carbon::parse($fechaStr);
 
             // UCI sin cobertura nocturna
-            $tieneNoche = $turnosDia->filter(fn($t) => in_array($t->codigo_turno, ['N','MTN','MN']))->isNotEmpty();
+            $tieneNoche = $turnosDia->filter(fn($t) => in_array($t->codigo_turno, ['N','TN','MTN','MN']))->isNotEmpty();
             if (!$tieneNoche) {
                 $count += $this->crearAlerta($archivoId, null, $uciId, $fecha, 'SIN_COBERTURA_NOCHE', 'alta',
                     "La {$nombreUci} no tiene cobertura nocturna el {$fecha->format('d/m/Y')}.");
