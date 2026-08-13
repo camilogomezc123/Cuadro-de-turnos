@@ -180,7 +180,7 @@ class CambioTurnoController extends Controller
         $horasActReceptor = $this->horasMedicoEnArchivo((int)$data['medico_receptor_id'], $archivoId);
         if (($horasActReceptor + $horasGanadas - $horasPerdidas) > 216
             && !$this->tieneAutorizacionHorasExtra((int)$data['medico_receptor_id'], $archivoId)) {
-            return back();
+            return back()->with('error', 'El médico receptor alcanzaría el límite de 216 h en este período. Solicita autorización al coordinador primero.');
         }
         // ──────────────────────────────────────────────────────────
 
@@ -217,7 +217,8 @@ class CambioTurnoController extends Controller
             ? 'Solicitud de cedencia enviada. El colega debe aceptar recibirla.'
             : 'Solicitud de cambio enviada. Esperando respuesta del colega.';
 
-        return back()->with('success', $msg);
+        return redirect()->route('cambios-turno.index', ['archivo_id' => $turnoOrigen->archivo_id])
+            ->with('success', $msg);
     }
 
     // ── Aceptar (colega receptor) ─────────────────────────────────
