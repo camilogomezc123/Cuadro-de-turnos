@@ -352,19 +352,27 @@
         <form method="GET" class="d-flex gap-2 flex-wrap align-items-center">
             <i class="bi bi-funnel text-muted"></i>
             <select name="archivo_id" class="form-select form-select-sm" style="max-width:155px" onchange="this.form.submit()">
+                @if($esMaestro)
+                <option value="" @selected(!request()->filled('archivo_id'))>Todos los períodos</option>
+                @endif
                 @foreach($archivos as $a)
-                    <option value="{{ $a->id }}" @selected($a->id == $archivoId)>
+                    <option value="{{ $a->id }}" @selected(request()->filled('archivo_id') && $a->id == $archivoId)>
                         {{ $a->nombre_mes }} {{ $a->anio }}
                     </option>
                 @endforeach
             </select>
             <select name="estado" class="form-select form-select-sm" style="max-width:165px" onchange="this.form.submit()">
                 <option value="">Todos los estados</option>
-                <option value="pendiente"             @selected($estado=='pendiente')>Pendiente respuesta</option>
-                <option value="aceptado_colega"       @selected($estado=='aceptado_colega')>Aceptado, pend. coord.</option>
-                <option value="aprobado_coordinador"  @selected($estado=='aprobado_coordinador')>Aprobados</option>
-                <option value="rechazado_coordinador" @selected($estado=='rechazado_coordinador')>Rechazados</option>
-                <option value="cancelado"             @selected($estado=='cancelado')>Cancelados</option>
+                <option value="pendiente"                     @selected($estado=='pendiente')>Pendiente respuesta</option>
+                <option value="enviado_a_receptor"             @selected($estado=='enviado_a_receptor')>Pendiente respuesta</option>
+                <option value="aceptado_colega"                @selected($estado=='aceptado_colega')>Aceptado, pend. admin.</option>
+                <option value="pendiente_aprobacion_maestro"   @selected($estado=='pendiente_aprobacion_maestro')>Aceptado, pend. admin.</option>
+                <option value="aprobado_coordinador"           @selected($estado=='aprobado_coordinador')>Aprobados</option>
+                <option value="aprobado_por_maestro"           @selected($estado=='aprobado_por_maestro')>Aprobados</option>
+                <option value="rechazado_coordinador"          @selected($estado=='rechazado_coordinador')>Rechazados</option>
+                <option value="rechazado_por_receptor"         @selected($estado=='rechazado_por_receptor')>Rechazados</option>
+                <option value="rechazado_por_maestro"          @selected($estado=='rechazado_por_maestro')>Rechazados</option>
+                <option value="cancelado"                      @selected($estado=='cancelado')>Cancelados</option>
             </select>
             <span class="ms-auto text-muted small">{{ $solicitudes->total() }} solicitud(es)</span>
         </form>
@@ -379,13 +387,18 @@
         $turnoYaAcordado = $s->turno_destino_id !== null;
 
         $colorEstado = match($s->estado) {
-            'pendiente'             => ['bg'=>'warning', 'txt'=>'Esperando respuesta'],
-            'aceptado_colega'       => ['bg'=>'info',    'txt'=>'Pendiente coordinador'],
-            'aprobado_coordinador'  => ['bg'=>'success', 'txt'=>'Aprobado ✓'],
+            'pendiente',
+            'enviado_a_receptor'           => ['bg'=>'warning', 'txt'=>'Esperando respuesta'],
+            'aceptado_colega',
+            'pendiente_aprobacion_maestro' => ['bg'=>'info',    'txt'=>'Pendiente administrador'],
+            'aprobado_coordinador',
+            'aprobado_por_maestro'         => ['bg'=>'success', 'txt'=>'Aprobado ✓'],
             'rechazado_colega',
-            'rechazado_coordinador' => ['bg'=>'danger',  'txt'=>'Rechazado'],
-            'cancelado'             => ['bg'=>'secondary','txt'=>'Cancelado'],
-            default                 => ['bg'=>'secondary','txt'=>$s->estado],
+            'rechazado_coordinador',
+            'rechazado_por_receptor',
+            'rechazado_por_maestro'        => ['bg'=>'danger',  'txt'=>'Rechazado'],
+            'cancelado'                    => ['bg'=>'secondary','txt'=>'Cancelado'],
+            default                        => ['bg'=>'secondary','txt'=>$s->estado],
         };
 
         $codigoOrigen   = $s->turnoOrigen?->codigo_turno  ?? '?';
@@ -394,7 +407,10 @@
     @endphp
 
     {{-- Destacar si requiere acción del usuario --}}
-    <div class="sol-card {{ ($s->estado==='pendiente' && $soyReceptor && !$esMiSolicitud) ? 'urgente' : '' }}">
+    @php
+        $requiereAccionMaestro = $esMaestro && in_array($s->estado, ['aceptado_colega','pendiente_aprobacion_maestro']);
+    @endphp
+    <div class="sol-card {{ (($s->estado==='pendiente' && $soyReceptor && !$esMiSolicitud) || $requiereAccionMaestro) ? 'urgente' : '' }}">
 
         {{-- Cabecera --}}
         <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
@@ -473,9 +489,9 @@
             @if(!$esCesion && !$turnoYaAcordado)
             {{-- Cambio sin turno pre-acordado: receptor elige su turno --}}
             <div class="mb-2">
-                <label class="form-label small text-muted mb-1">¿Qué turno ofreces a cambio?</label>
-                <select class="form-select form-select-sm dest-select" data-sol="{{ $s->id }}">
-                    <option value="">— Sin especificar (acepto y acordamos después) —</option>
+                <label class="form-label small text-muted mb-1">¿Qué turno ofreces a cambio? *</label>
+                <select class="form-select form-select-sm dest-select" data-sol="{{ $s->id }}" required>
+                    <option value="">— Selecciona un turno —</option>
                     @foreach($misTurnosDisponibles as $td)
                     <option value="{{ $td->id }}">
                         {{ $td->fecha->format('d/m') }} · {{ $td->codigo_turno }}
@@ -492,7 +508,8 @@
             @endif
 
             <div class="d-flex gap-2">
-                <form method="POST" action="{{ route('cambios-turno.aceptar', $s) }}" class="flex-fill aceptar-form" data-sol="{{ $s->id }}">
+                <form method="POST" action="{{ route('cambios-turno.aceptar', $s) }}" class="flex-fill aceptar-form" data-sol="{{ $s->id }}"
+                      @if(!$esCesion && !$turnoYaAcordado) onsubmit="if(!this.querySelector('.dest-hidden').value){alert('Selecciona qué turno ofreces a cambio.');return false;}" @endif>
                     @csrf @method('PATCH')
                     @if(!$esCesion && !$turnoYaAcordado)
                     <input type="hidden" name="turno_destino_id" class="dest-hidden" value="">
@@ -523,6 +540,17 @@
                     <i class="bi bi-x me-1"></i>Anular
                 </button>
             </form>
+        </div>
+
+        {{-- Solicitud enviada desde "Mis Turnos": el receptor debe responder ahí --}}
+        @elseif($s->estado === 'enviado_a_receptor' && $soyReceptor && !$esMiSolicitud)
+        <div class="small text-warning">
+            <i class="bi bi-bell me-1"></i>Debes responder esta solicitud desde <a href="{{ route('medico.portal') }}">Mis Turnos</a>.
+        </div>
+
+        @elseif($s->estado === 'enviado_a_receptor' && $esMiSolicitud)
+        <div class="small text-muted">
+            <i class="bi bi-hourglass-split me-1"></i>Esperando respuesta de {{ $s->medicoReceptor?->nombre ?? 'colega' }}
         </div>
 
         {{-- Rechazado por colega --}}
@@ -563,7 +591,35 @@
             <i class="bi bi-clock-history me-1"></i>Aceptado — pendiente aprobación del coordinador
         </div>
 
-        @elseif($s->estado === 'aprobado_coordinador')
+        {{-- Aceptado por el receptor desde "Mis Turnos": pendiente de que el maestro apruebe --}}
+        @elseif($s->estado === 'pendiente_aprobacion_maestro' && $esMaestro)
+        <div class="d-flex gap-2 flex-wrap">
+            <form method="POST" action="{{ route('cambios.aprobar', $s) }}" class="flex-fill"
+                  onsubmit="return confirm('¿Confirmar y aplicar? Se modificarán los turnos en el cuadro.')">
+                @csrf
+                <button class="btn btn-primary btn-sm w-100 fw-semibold">
+                    <i class="bi bi-check-all me-1"></i>Aprobar y aplicar
+                </button>
+            </form>
+            <form method="POST" action="{{ route('cambios.rechazar', $s) }}" class="flex-fill">
+                @csrf
+                <button class="btn btn-outline-danger btn-sm w-100">
+                    <i class="bi bi-x me-1"></i>Rechazar
+                </button>
+            </form>
+        </div>
+
+        @elseif($s->estado === 'pendiente_aprobacion_maestro' && !$esMaestro)
+        <div class="small text-info">
+            <i class="bi bi-clock-history me-1"></i>Aceptado por el colega — pendiente aprobación del administrador
+        </div>
+
+        @elseif($s->estado === 'enviado_a_receptor' && $esMaestro)
+        <div class="small text-muted">
+            <i class="bi bi-hourglass-split me-1"></i>Esperando respuesta del médico receptor
+        </div>
+
+        @elseif($s->estado === 'aprobado_coordinador' || $s->estado === 'aprobado_por_maestro')
         <div class="small text-success">
             <i class="bi bi-check-all me-1"></i>Aplicado al cuadro de turnos
             @if($s->resuelto_at) · {{ $s->resuelto_at->format('d/m/Y') }} @endif
@@ -573,6 +629,7 @@
         <div class="small text-danger">
             <i class="bi bi-x-circle me-1"></i>Rechazado
             @if($s->motivo_coordinador) — {{ $s->motivo_coordinador }}
+            @elseif($s->observacion_maestro) — {{ $s->observacion_maestro }}
             @elseif($s->respuesta_colega) — {{ $s->respuesta_colega }}
             @endif
         </div>

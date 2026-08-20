@@ -264,8 +264,8 @@
                             <td class="fw-semibold">{{ $r->medico?->nombre_completo ?? '—' }}</td>
                             <td class="small text-muted">{{ $r->medico?->uci?->nombre ?? '—' }}</td>
                             <td class="text-center"><span class="badge bg-{{ $clNivel }}">{{ ucfirst($nivel) }}</span></td>
-                            <td class="text-center">{{ $r->burnout_positivo ? '<span class="badge bg-warning text-dark">Positivo</span>' : '<span class="text-muted small">—</span>' }}</td>
-                            <td class="text-center">{{ $r->burnout_severo ? '<span class="badge bg-danger">Crítica</span>' : '<span class="text-muted small">—</span>' }}</td>
+                            <td class="text-center">{!! $r->burnout_positivo ? '<span class="badge bg-warning text-dark">Positivo</span>' : '<span class="text-muted small">—</span>' !!}</td>
+                            <td class="text-center">{!! $r->burnout_severo ? '<span class="badge bg-danger">Crítica</span>' : '<span class="text-muted small">—</span>' !!}</td>
                             <td class="text-center {{ $r->supera_200h ? 'text-danger fw-bold' : '' }}">{{ $r->horas_programadas_mes }}h</td>
                             <td class="text-center">{{ $r->turnos_nocturnos }}</td>
                         </tr>

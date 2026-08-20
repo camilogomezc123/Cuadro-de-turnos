@@ -140,7 +140,7 @@ class MedicoPortalController extends Controller
         $this->requireMedico();
         $request->validate([
             'turno_id' => 'required|exists:turno_medicos,id',
-            'motivo'   => 'nullable|string|max:300',
+            'motivo'   => 'required|string|min:5|max:300',
         ]);
 
         $medico = Auth::user()->medico;
@@ -212,7 +212,7 @@ class MedicoPortalController extends Controller
             'turno_origen_id'    => 'required|exists:turno_medicos,id',
             'medico_receptor_id' => 'required|exists:medicos,id',
             'turno_destino_id'   => 'nullable|exists:turno_medicos,id',
-            'motivo'             => 'nullable|string|max:300',
+            'motivo'             => 'required|string|min:5|max:300',
         ]);
 
         $medico      = Auth::user()->medico;

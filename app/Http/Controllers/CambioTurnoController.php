@@ -21,8 +21,9 @@ class CambioTurnoController extends Controller
 
     public function index(Request $request)
     {
-        $user    = auth()->user();
-        $estado  = $request->string('estado', '');
+        $user      = auth()->user();
+        $estado    = $request->string('estado', '');
+        $esMaestro = $user->esMaster();
 
         $archivos  = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get();
         $archivoId = (int)($request->archivo_id ?? $archivos->first()?->id ?? 0);
@@ -54,7 +55,10 @@ class CambioTurnoController extends Controller
 
         if ($estado) $query->where('estado', $estado);
 
-        if ($archivo) {
+        // El maestro ve solicitudes de todos los períodos por defecto;
+        // solo se filtra por período si él mismo elige uno explícitamente.
+        $filtrarPorPeriodo = !$esMaestro || $request->filled('archivo_id');
+        if ($archivo && $filtrarPorPeriodo) {
             $query->whereHas('turnoOrigen', fn($q) =>
                 $q->whereYear('fecha', $archivo->anio)->whereMonth('fecha', $archivo->mes)
             );
@@ -62,7 +66,6 @@ class CambioTurnoController extends Controller
 
         $solicitudes = $query->paginate(25)->withQueryString();
         $medicos     = Medico::where('activo', true)->orderBy('nombre')->get();
-        $esMaestro   = $user->esMaster();
 
         // Pre-cargar mis turnos disponibles (receptor) para evitar N+1 en el listado
         $misTurnosDisponibles = collect();
@@ -235,10 +238,14 @@ class CambioTurnoController extends Controller
             return back()->with('error', 'Esta solicitud ya fue respondida.');
         }
 
-        $request->validate(['turno_destino_id' => 'nullable|exists:turno_medicos,id']);
-
         // Para cedencia no se necesita turno_destino.
         // Para cambio_directo: usar el ya propuesto por el solicitante o el que indique el receptor ahora.
+        // Si el solicitante no propuso turno, el receptor debe indicar uno (si no, el maestro nunca podría aprobar).
+        $reglaDestino = ($cambio->tipo_movimiento === 'cambio_directo' && !$cambio->turno_destino_id)
+            ? 'required|exists:turno_medicos,id'
+            : 'nullable|exists:turno_medicos,id';
+        $request->validate(['turno_destino_id' => $reglaDestino]);
+
         $turnoDest = null;
         if ($cambio->tipo_movimiento === 'cambio_directo') {
             $turnoDest = $cambio->turno_destino_id ?? $request->turno_destino_id;
@@ -355,7 +362,7 @@ class CambioTurnoController extends Controller
             $deltaRec      = ($horasReceptor['total'] ?? 0) - ($tReceptor?->horas_total ?? 0);
             if (($horasRecTotal + $deltaRec) > 216
                 && !$this->tieneAutorizacionHorasExtra($cambio->medico_receptor_id, $tOrigen->archivo_id)) {
-                return back();
+                return back()->with('error', 'No se puede aprobar: el médico receptor superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
             }
             // ──────────────────────────────────────────────────────
 
@@ -427,14 +434,14 @@ class CambioTurnoController extends Controller
                 $deltaSol = ($horasA['total'] ?? 0) - ($tOrigen->horas_total ?? 0);
                 if (($hSolAct + $deltaSol) > 216
                     && !$this->tieneAutorizacionHorasExtra($tOrigen->medico_id, $tOrigen->archivo_id)) {
-                    return back();
+                    return back()->with('error', 'No se puede aprobar: el médico solicitante superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
                 }
                 // ── Check 216h receptor ────────────────────────────
                 $hRecAct = $this->horasMedicoEnArchivo($tDestino->medico_id, $tDestino->archivo_id);
                 $deltaRec = ($horasB['total'] ?? 0) - ($tDestino->horas_total ?? 0);
                 if (($hRecAct + $deltaRec) > 216
                     && !$this->tieneAutorizacionHorasExtra($tDestino->medico_id, $tDestino->archivo_id)) {
-                    return back();
+                    return back()->with('error', 'No se puede aprobar: el médico receptor superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
                 }
                 // ──────────────────────────────────────────────────
 

@@ -398,8 +398,8 @@
                 <input type="hidden" name="turno_id" id="ofertar_turno_id">
                 <div class="alert alert-info" id="ofertar_info"></div>
                 <div class="mb-3">
-                    <label class="form-label">Motivo (opcional)</label>
-                    <textarea name="motivo" class="form-control" rows="2"></textarea>
+                    <label class="form-label">Motivo *</label>
+                    <textarea name="motivo" class="form-control" rows="2" required minlength="5" maxlength="300"></textarea>
                 </div>
                 <p class="text-muted small">El turno quedará disponible para otros médicos. Un administrador debe aprobar el cambio final.</p>
             </div>
@@ -470,8 +470,8 @@
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Motivo</label>
-                        <textarea name="motivo" class="form-control" rows="2"></textarea>
+                        <label class="form-label">Motivo *</label>
+                        <textarea name="motivo" class="form-control" rows="2" required minlength="5" maxlength="300"></textarea>
                     </div>
                 </div>
             </div>
