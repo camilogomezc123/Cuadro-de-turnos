@@ -212,6 +212,7 @@ class MedicoPortalController extends Controller
             'turno_origen_id'    => 'required|exists:turno_medicos,id',
             'medico_receptor_id' => 'required|exists:medicos,id',
             'turno_destino_id'   => 'nullable|exists:turno_medicos,id',
+            'componente_turno'   => 'nullable|string|max:10',
             'motivo'             => 'required|string|min:5|max:300',
         ]);
 
@@ -220,6 +221,14 @@ class MedicoPortalController extends Controller
 
         if ($turnoOrigen->medico_id !== $medico->id) {
             return back()->with('error', 'Ese turno no te pertenece.');
+        }
+
+        $componente = $request->filled('componente_turno') ? strtoupper(trim($request->componente_turno)) : null;
+        if ($componente) {
+            $ofrecibles = array_column(CambioTurnoController::componentesOfrecibles($turnoOrigen->codigo_turno), 'valor');
+            if (!in_array($componente, $ofrecibles, true)) {
+                return back()->with('error', "El componente {$componente} no puede ofrecerse desde un turno {$turnoOrigen->codigo_turno}.");
+            }
         }
 
         $existe = SolicitudCambioTurno::where('turno_origen_id', $turnoOrigen->id)
@@ -233,6 +242,7 @@ class MedicoPortalController extends Controller
             'tipo_movimiento'       => $request->tipo_movimiento,
             'turno_origen_id'       => $turnoOrigen->id,
             'turno_destino_id'      => $request->turno_destino_id,
+            'componente_turno'      => $componente,
             'medico_solicitante_id' => $medico->id,
             'medico_receptor_id'    => $request->medico_receptor_id,
             'motivo'                => $request->motivo,
@@ -304,8 +314,7 @@ class MedicoPortalController extends Controller
             $to = $solicitud->turnoOrigen;
             $td = $solicitud->turnoDestino;
 
-            if ($solicitud->tipo_movimiento === 'oferta_abierta' || $solicitud->tipo_movimiento === 'donacion_directa') {
-                // Pasar el turno al receptor
+            if ($solicitud->tipo_movimiento === 'oferta_abierta') {
                 if ($to) {
                     $to->update([
                         'medico_id'         => $solicitud->medico_receptor_id,
@@ -314,19 +323,105 @@ class MedicoPortalController extends Controller
                         'fue_laborado'      => true,
                     ]);
                 }
-            } elseif ($solicitud->tipo_movimiento === 'cambio_directo' && $to && $td) {
-                // Intercambiar médicos
-                $medicoOrig = $to->medico_id;
-                $medicoDest = $td->medico_id;
+            } elseif ($solicitud->tipo_movimiento === 'donacion_directa') {
+                if ($to) {
+                    $componente = $solicitud->componente_turno ?: $to->codigo_turno;
+                    if ($componente && $solicitud->componente_turno) {
+                        $codigoRestante = CambioTurnoController::restarComponente($to->codigo_turno, $componente);
+                        $horasRestantes = \App\Services\TurnoService::horasPorCodigo($codigoRestante);
+                        $to->update([
+                            'codigo_turno' => $codigoRestante,
+                            'horas_diurnas' => $horasRestantes['diurnas'],
+                            'horas_nocturnas' => $horasRestantes['nocturnas'],
+                            'horas_total' => $horasRestantes['total'],
+                            'estado_turno' => 'aceptado_por_otro',
+                            'medico_original_id' => $to->medico_id,
+                            'fue_laborado' => true,
+                        ]);
 
-                $to->update([
-                    'medico_id'    => $medicoDest,
-                    'estado_turno' => 'reemplazado',
-                ]);
-                $td->update([
-                    'medico_id'    => $medicoOrig,
-                    'estado_turno' => 'reemplazado',
-                ]);
+                        $tReceptor = TurnoMedico::where('medico_id', $solicitud->medico_receptor_id)
+                            ->where('archivo_id', $to->archivo_id)
+                            ->where('fecha', $to->fecha)
+                            ->first();
+
+                        $codigoActual = $tReceptor?->codigo_turno ?? 'LIBRE';
+                        $codigoNuevo = CambioTurnoController::mergeComponente($codigoActual, $componente);
+                        $horasNuevo = \App\Services\TurnoService::horasPorCodigo($codigoNuevo);
+
+                        if ($tReceptor) {
+                            $tReceptor->update([
+                                'codigo_turno' => $codigoNuevo,
+                                'horas_diurnas' => $horasNuevo['diurnas'],
+                                'horas_nocturnas' => $horasNuevo['nocturnas'],
+                                'horas_total' => $horasNuevo['total'],
+                                'estado_turno' => 'programado',
+                            ]);
+                        } else {
+                            $fecha = \Carbon\Carbon::parse($to->fecha);
+                            $dow = $fecha->dayOfWeek;
+                            $idx = ($dow === 0) ? 6 : $dow - 1;
+                            $dias = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+                            TurnoMedico::create([
+                                'archivo_id' => $to->archivo_id,
+                                'medico_id' => $solicitud->medico_receptor_id,
+                                'uci_id' => $to->uci_id,
+                                'fecha' => $to->fecha,
+                                'dia_numero' => $fecha->day,
+                                'dia_semana' => $dias[$idx],
+                                'codigo_turno' => $codigoNuevo,
+                                'horas_diurnas' => $horasNuevo['diurnas'],
+                                'horas_nocturnas' => $horasNuevo['nocturnas'],
+                                'horas_total' => $horasNuevo['total'],
+                                'es_fin_semana' => in_array($dow, [0,6]),
+                                'es_domingo' => ($dow === 0),
+                                'estado_turno' => 'programado',
+                                'fue_laborado' => true,
+                            ]);
+                        }
+                    } else {
+                        $to->update([
+                            'medico_id' => $solicitud->medico_receptor_id,
+                            'estado_turno' => 'aceptado_por_otro',
+                            'medico_original_id' => $to->medico_id,
+                            'fue_laborado' => true,
+                        ]);
+                    }
+                }
+            } elseif ($solicitud->tipo_movimiento === 'cambio_directo' && $to && $td) {
+                if ($solicitud->componente_turno) {
+                    $componente = strtoupper(trim($solicitud->componente_turno));
+                    $codigoOrigenNuevo = CambioTurnoController::restarComponente($to->codigo_turno, $componente);
+                    $codigoDestinoNuevo = CambioTurnoController::mergeComponente($td->codigo_turno, $componente);
+                    $horasOrigen = \App\Services\TurnoService::horasPorCodigo($codigoOrigenNuevo);
+                    $horasDestino = \App\Services\TurnoService::horasPorCodigo($codigoDestinoNuevo);
+
+                    $to->update([
+                        'codigo_turno' => $codigoOrigenNuevo,
+                        'horas_diurnas' => $horasOrigen['diurnas'],
+                        'horas_nocturnas' => $horasOrigen['nocturnas'],
+                        'horas_total' => $horasOrigen['total'],
+                        'estado_turno' => 'reemplazado',
+                    ]);
+                    $td->update([
+                        'codigo_turno' => $codigoDestinoNuevo,
+                        'horas_diurnas' => $horasDestino['diurnas'],
+                        'horas_nocturnas' => $horasDestino['nocturnas'],
+                        'horas_total' => $horasDestino['total'],
+                        'estado_turno' => 'reemplazado',
+                    ]);
+                } else {
+                    $medicoOrig = $to->medico_id;
+                    $medicoDest = $td->medico_id;
+
+                    $to->update([
+                        'medico_id' => $medicoDest,
+                        'estado_turno' => 'reemplazado',
+                    ]);
+                    $td->update([
+                        'medico_id' => $medicoOrig,
+                        'estado_turno' => 'reemplazado',
+                    ]);
+                }
             }
 
             AuditoriaSistema::registrar(

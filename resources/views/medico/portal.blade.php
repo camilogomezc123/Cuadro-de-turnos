@@ -434,8 +434,15 @@
                         <select name="turno_origen_id" id="turnoOrigen" class="form-select" required>
                             <option value="">Seleccione...</option>
                             @foreach($misTurnos->filter(fn($t)=>$t->esTurnoActivo() && \Carbon\Carbon::parse($t->fecha)->isFuture()) as $t)
-                                <option value="{{ $t->id }}">{{ $t->fecha->format('d/m') }} — {{ $t->codigo_turno }} ({{ $t->uci?->codigo }})</option>
+                                <option value="{{ $t->id }}" data-codigo="{{ $t->codigo_turno }}">{{ $t->fecha->format('d/m') }} — {{ $t->codigo_turno }} ({{ $t->uci?->codigo }})</option>
                             @endforeach
+                        </select>
+                    </div>
+
+                    <div class="col-md-6" id="divComponenteTurno" style="display:none">
+                        <label class="form-label fw-bold">Componente</label>
+                        <select name="componente_turno" id="componenteTurno" class="form-select">
+                            <option value="">Turno completo</option>
                         </select>
                     </div>
 
@@ -577,6 +584,46 @@ function abrirOfrecer(id,fecha,codigo){
 }
 const MES={{ $mes }}, ANIO={{ $anio }};
 
+function actualizarComponenteTurno() {
+    const selectOrigen = document.getElementById('turnoOrigen');
+    const selectComp = document.getElementById('componenteTurno');
+    const divComp = document.getElementById('divComponenteTurno');
+    if (!selectOrigen || !selectComp || !divComp) return;
+
+    const option = selectOrigen.selectedOptions[0];
+    const codigo = option?.dataset?.codigo || '';
+    const variantes = {
+        'M': ['M'],
+        'T': ['T'],
+        'MT': ['MT', 'M', 'T'],
+        'TN': ['TN', 'T', 'N'],
+        'MTN': ['MTN', 'MT', 'T', 'N'],
+        'MN': ['MN', 'M', 'N'],
+    };
+
+    const comps = variantes[codigo] ?? [codigo || ''];
+    const labels = {
+        'M': 'Solo M (6h)',
+        'T': 'Solo T (6h)',
+        'MT': 'MT completo (12h)',
+        'TN': 'TN completo (18h)',
+        'MTN': 'MTN completo (24h)',
+        'MN': 'MN completo (18h)',
+        'N': 'Solo N (12h)',
+    };
+
+    selectComp.innerHTML = '<option value="">Turno completo</option>' + comps.map(c => {
+        if (!c) return '';
+        const label = labels[c] || `${c} (turno completo)`;
+        return `<option value="${c}">${label}</option>`;
+    }).join('');
+
+    divComp.style.display = comps.length > 1 ? '' : 'none';
+    if (comps.length <= 1) {
+        selectComp.value = '';
+    }
+}
+
 // ── Turnos del receptor ──────────────────────────────────────────
 function cargarTurnosReceptor() {
     const medicoId = document.getElementById('medicoReceptor')?.value;
@@ -688,7 +735,10 @@ function cargarTurnosReceptorConPreseleccion(medicoId, preseleccionarTurnoId) {
 }
 
 // ── Eventos ──────────────────────────────────────────────────────
-document.getElementById('turnoOrigen')?.addEventListener('change', cargarCandidatos);
+document.getElementById('turnoOrigen')?.addEventListener('change', function() {
+    actualizarComponenteTurno();
+    cargarCandidatos();
+});
 document.getElementById('medicoReceptor')?.addEventListener('change', cargarTurnosReceptor);
 document.getElementById('tipoMov')?.addEventListener('change', function() {
     const don = this.value === 'donacion_directa';
