@@ -19,16 +19,38 @@ class TurnoMedico extends Model
         'estado_turno', 'fue_laborado', 'horas_reconocidas',
         'medico_original_id', 'medico_reemplazo_id',
         'motivo_modificacion', 'modificado_por_usuario_id', 'fecha_modificacion',
+        'recordatorio_enviado_at',
     ];
 
     protected $casts = [
-        'fecha'                => 'date',
-        'es_fin_semana'        => 'boolean',
-        'es_domingo'           => 'boolean',
-        'es_codigo_no_oficial' => 'boolean',
-        'fue_laborado'         => 'boolean',
-        'fecha_modificacion'   => 'datetime',
+        'fecha'                    => 'date',
+        'es_fin_semana'            => 'boolean',
+        'es_domingo'               => 'boolean',
+        'es_codigo_no_oficial'     => 'boolean',
+        'fue_laborado'             => 'boolean',
+        'fecha_modificacion'       => 'datetime',
+        'recordatorio_enviado_at'  => 'datetime',
     ];
+
+    // Hora de inicio (24h) de cada código de turno, para calcular el momento del recordatorio
+    const HORA_INICIO = [
+        'M'   => '07:00',
+        'T'   => '13:00',
+        'MT'  => '07:00',
+        'N'   => '19:00',
+        'MTN' => '07:00',
+        'MN'  => '07:00',
+    ];
+
+    public function getInicioTurnoAttribute(): ?\Carbon\Carbon
+    {
+        $hora = self::HORA_INICIO[$this->codigo_turno] ?? null;
+        if (!$hora || !$this->fecha) {
+            return null;
+        }
+
+        return \Carbon\Carbon::parse($this->fecha->toDateString().' '.$hora);
+    }
 
     // Horas efectivamente reconocidas (usa horas_reconocidas si fue modificado, sino horas_total)
     public function getHorasEfectivasAttribute(): float

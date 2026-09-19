@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Notifications\Notifiable;
 
 class Medico extends Model
 {
+    use Notifiable;
+
     protected $fillable = [
         'nombre', 'apellido', 'documento', 'email', 'telefono',
         'uci_id', 'activo', 'puede_ingresar_sistema', 'fecha_creacion_usuario',

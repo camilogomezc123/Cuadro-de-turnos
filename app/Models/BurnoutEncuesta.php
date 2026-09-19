@@ -44,6 +44,10 @@ class BurnoutEncuesta extends Model
 
     public static function activa(): ?self
     {
+        if (!config('app.burnout_enabled', false)) {
+            return null;
+        }
+
         return static::where('activa', true)->latest()->first();
     }
 }

@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'burnout_enabled' => env('BURNOUT_ENABLED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
