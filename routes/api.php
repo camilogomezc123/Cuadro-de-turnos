@@ -5,6 +5,10 @@ use App\Models\Medico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/v1/turnos', \App\Http\Controllers\Api\TurnosController::class)
+    ->middleware(['throttle:60,1', \App\Http\Middleware\TurnosApiKey::class])
+    ->name('api.v1.turnos');
+
 Route::get('/medicos', function (Request $request) {
     $archivoId = $request->get('archivo_id');
 
