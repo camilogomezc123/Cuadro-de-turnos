@@ -219,7 +219,7 @@
                         <span class="day-num">{{ $dNum }}</span>
                         @if($codigo)
                             <span class="shift-badge t-{{ $codigo }} d-block mt-1" style="font-size:.65rem">{{ $codigo }}</span>
-                            @if($turno && $turno->esTurnoActivo() && !\Carbon\Carbon::parse($info['fecha'])->isPast())
+                            @if($turno && $turno->esTurnoActivo() && \Carbon\Carbon::parse($info['fecha'])->startOfDay()->gte(\Carbon\Carbon::today()))
                                 <button class="btn btn-link p-0 mt-1" style="font-size:.58rem;color:#f59e0b"
                                         onclick="abrirOfrecer({{ $turno->id }},'{{ $info['fecha'] }}','{{ $codigo }}')">
                                     Ofrecer
@@ -433,7 +433,7 @@
                         <label class="form-label fw-bold">Mi turno</label>
                         <select name="turno_origen_id" id="turnoOrigen" class="form-select" required>
                             <option value="">Seleccione...</option>
-                            @foreach($misTurnos->filter(fn($t)=>$t->esTurnoActivo() && \Carbon\Carbon::parse($t->fecha)->isFuture()) as $t)
+                            @foreach($misTurnos->filter(fn($t)=>$t->esTurnoActivo() && \Carbon\Carbon::parse($t->fecha)->startOfDay()->gte(\Carbon\Carbon::today())) as $t)
                                 <option value="{{ $t->id }}" data-codigo="{{ $t->codigo_turno }}">{{ $t->fecha->format('d/m') }} — {{ $t->codigo_turno }} ({{ $t->uci?->codigo }})</option>
                             @endforeach
                         </select>

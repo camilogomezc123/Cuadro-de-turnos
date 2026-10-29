@@ -149,7 +149,7 @@ class MedicoPortalController extends Controller
         if ($turno->medico_id !== $medico->id) {
             return back()->with('error', 'Ese turno no te pertenece.');
         }
-        if (Carbon::parse($turno->fecha)->isPast()) {
+        if (Carbon::parse($turno->fecha)->startOfDay()->lt(Carbon::today())) {
             return back()->with('error', 'No se puede ofrecer un turno pasado.');
         }
 

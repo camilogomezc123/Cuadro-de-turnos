@@ -16,7 +16,9 @@ class AlertaController extends Controller
     {
         $archivos   = ArchivoCargado::where('procesado', true)->orderByDesc('anio')->orderByDesc('mes')->get();
         $ucis       = Uci::where('activa', true)->orderBy('nombre')->get();
-        $archivoId  = $request->integer('archivo_id', $archivos->first()?->id ?? 0);
+        // Por defecto se muestran alertas de TODOS los períodos; antes se filtraba al
+        // archivo más reciente y ocultaba alertas abiertas de meses anteriores.
+        $archivoId  = $request->integer('archivo_id', 0);
         $uciId      = $request->integer('uci_id', 0);
         $prioridad  = $request->string('prioridad', '');
         $estado     = $request->string('estado', 'abierta');
@@ -33,8 +35,10 @@ class AlertaController extends Controller
         if ($tipo)      $query->where('tipo', $tipo);
 
         $alertas     = $query->paginate(50)->withQueryString();
-        $totalAbiertas = AlertaTurno::where('archivo_id', $archivoId)->where('estado', 'abierta')->count();
-        $totalAltas    = AlertaTurno::where('archivo_id', $archivoId)->where('prioridad', 'alta')->where('estado', 'abierta')->count();
+        $totalAbiertas = AlertaTurno::when($archivoId, fn($q) => $q->where('archivo_id', $archivoId))
+            ->where('estado', 'abierta')->count();
+        $totalAltas    = AlertaTurno::when($archivoId, fn($q) => $q->where('archivo_id', $archivoId))
+            ->where('prioridad', 'alta')->where('estado', 'abierta')->count();
         $tipos         = AlertaTurno::TIPOS;
 
         return view('alertas.index', compact(
