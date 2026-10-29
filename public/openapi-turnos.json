@@ -1,0 +1,249 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Turnos UCI",
+    "version": "1.0.0",
+    "description": "Consulta autenticada de asignaciones por fecha y UCI."
+  },
+  "servers": [
+    {
+      "url": "https://gruposdetrabajo.koqoi.com"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/turnos": {
+      "get": {
+        "operationId": "consultarTurnosUci",
+        "summary": "Consultar médicos de turno por UCI y fecha",
+        "description": "Solo lectura. Día civil de Colombia: incluye noche previa y separa MN. No confirma asistencia real. Si falta programación o no hay turnos registrados, informar esa limitación sin inventar cobertura.",
+        "parameters": [
+          {
+            "name": "fecha",
+            "in": "query",
+            "required": false,
+            "description": "YYYY-MM-DD. Si se omite: hoy en America/Bogota.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "uci",
+            "in": "query",
+            "required": false,
+            "description": "Código exacto de UCI activa. Omitir para todas.",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Programación vigente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "fecha",
+                    "zona_horaria",
+                    "consultado_en",
+                    "programacion_cargada",
+                    "programacion_dia_anterior_cargada",
+                    "criterio",
+                    "ucis"
+                  ],
+                  "properties": {
+                    "fecha": {
+                      "type": "string",
+                      "format": "date"
+                    },
+                    "zona_horaria": {
+                      "type": "string"
+                    },
+                    "consultado_en": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "programacion_cargada": {
+                      "type": "boolean"
+                    },
+                    "programacion_dia_anterior_cargada": {
+                      "type": "boolean"
+                    },
+                    "criterio": {
+                      "type": "string"
+                    },
+                    "ucis": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "codigo",
+                          "nombre",
+                          "estado",
+                          "turnos"
+                        ],
+                        "properties": {
+                          "codigo": {
+                            "type": "string"
+                          },
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "con_turnos",
+                              "sin_turnos_registrados"
+                            ]
+                          },
+                          "turnos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "medico",
+                                "codigo_turno",
+                                "fecha_programacion",
+                                "inicio",
+                                "fin",
+                                "estado"
+                              ],
+                              "properties": {
+                                "medico": {
+                                  "type": "string"
+                                },
+                                "codigo_turno": {
+                                  "type": "string",
+                                  "enum": [
+                                    "M",
+                                    "T",
+                                    "MT",
+                                    "N",
+                                    "TN",
+                                    "MTN",
+                                    "MN"
+                                  ]
+                                },
+                                "fecha_programacion": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "inicio": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "fin": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "estado": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-openai-isConsequential": false
+      }
+    }
+  }
+}
