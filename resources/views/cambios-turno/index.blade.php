@@ -28,6 +28,7 @@
 .tc-T  { color:#2E7D32; } .tc-T  .tc-code { background:#e8f5e9; color:#2E7D32; }
 .tc-MT { color:#00838F; } .tc-MT .tc-code { background:#e0f7fa; color:#00838F; }
 .tc-N  { color:#4A148C; } .tc-N  .tc-code { background:#ede7f6; color:#4A148C; }
+.tc-TN { color:#283593; } .tc-TN .tc-code { background:#e8eaf6; color:#283593; }
 .tc-MTN{ color:#880E4F; } .tc-MTN .tc-code{ background:#fce4ec; color:#880E4F; }
 .tc-MN { color:#E65100; } .tc-MN .tc-code { background:#fff3e0; color:#E65100; }
 
@@ -79,6 +80,7 @@
 .tp-T   { background:#e8f5e9; color:#2E7D32; }
 .tp-MT  { background:#e0f7fa; color:#00838F; }
 .tp-N   { background:#ede7f6; color:#4A148C; }
+.tp-TN  { background:#e8eaf6; color:#283593; }
 .tp-MTN { background:#fce4ec; color:#880E4F; }
 .tp-MN  { background:#fff3e0; color:#E65100; }
 .tp-def { background:#f1f5f9; color:#475569; }
@@ -331,7 +333,7 @@
 <div class="panel mt-3 p-3">
     <div class="small fw-semibold text-muted mb-2"><i class="bi bi-info-circle me-1"></i>Guía de turnos</div>
     <div class="d-flex flex-wrap gap-2">
-        @foreach(['M'=>'Mañana · 6h','T'=>'Tarde · 6h','MT'=>'Mañana+Tarde · 12h','N'=>'Noche · 12h','MTN'=>'Todo el día · 24h','MN'=>'Mañana+Noche · 18h'] as $c => $desc)
+        @foreach(['M'=>'Mañana · 6h','T'=>'Tarde · 6h','MT'=>'Mañana+Tarde · 12h','N'=>'Noche · 12h','TN'=>'Tarde+Noche · 18h','MTN'=>'Todo el día · 24h','MN'=>'Mañana+Noche · 18h'] as $c => $desc)
         <div class="d-flex align-items-center gap-1">
             <span class="turno-pill tp-{{ $c }}">{{ $c }}</span>
             <span class="text-muted" style="font-size:.7rem">{{ $desc }}</span>
@@ -660,8 +662,8 @@ const URL_MIS_TURNOS  = '{{ route("cambios-turno.mis-turnos") }}';
 const URL_TUR_REC     = '{{ route("cambios-turno.turnos-receptor") }}';
 const ARCHIVO_ACTUAL  = {{ $archivoId ?: 0 }};
 
-const HORAS = { M:6, T:6, N:12, MT:12, MN:18, MTN:24 };
-const COLORES = { M:'tp-M', T:'tp-T', MT:'tp-MT', N:'tp-N', MTN:'tp-MTN', MN:'tp-MN' };
+const HORAS = { M:6, T:6, N:12, MT:12, TN:18, MN:18, MTN:24 };
+const COLORES = { M:'tp-M', T:'tp-T', MT:'tp-MT', N:'tp-N', TN:'tp-TN', MTN:'tp-MTN', MN:'tp-MN' };
 
 /* ── Estado del wizard ──────────────────────────── */
 const W = {

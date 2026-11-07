@@ -10,6 +10,7 @@
 <style>
 .t-M{background:#BBDEFB;color:#1565C0}.t-T{background:#C8E6C9;color:#2E7D32}
 .t-MT{background:#FFE0B2;color:#E65100}.t-N{background:#D1C4E9;color:#4527A0}
+.t-TN{background:#C5CAE9;color:#283593}
 .t-MTN{background:#F48FB1;color:#880E4F}.t-MN{background:#FCE4EC;color:#880E4F}
 .t-PER{background:#FFFDE7;color:#F57F17}.t-INC{background:#FFEBEE;color:#C62828}
 .shift-badge{display:inline-block;padding:.2rem .55rem;border-radius:6px;font-size:.75rem;font-weight:700}

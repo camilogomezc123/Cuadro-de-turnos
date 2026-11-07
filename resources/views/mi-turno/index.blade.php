@@ -45,12 +45,18 @@
     line-height: 1;
 }
 .cal-cell.finde .cal-num { color:#e11d48; }
+.cal-badges {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
 .cal-badge {
     font-size: .62rem;
     font-weight: 700;
     border-radius: 4px;
     padding: 1px 4px;
-    margin-top: auto;
     line-height: 1.4;
     white-space: nowrap;
 }
@@ -192,8 +198,8 @@
             // Convertir a Lun=0: si Dom(0)->6, else dow-1
             $primerDia = ($firstDow === 0) ? 6 : $firstDow - 1;
             $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mesNum, $anioNum);
-            // Indexar turnos por dia_numero
-            $turnosPorDia = $turnos->keyBy('dia_numero');
+            // Indexar turnos por dia_numero (un médico puede tener más de un turno el mismo día, en UCIs distintas)
+            $turnosPorDia = $turnos->groupBy('dia_numero');
             $hoy = now()->day . '-' . now()->month . '-' . now()->year;
         @endphp
 
@@ -212,19 +218,21 @@
             {{-- Días del mes --}}
             @for($d = 1; $d <= $diasEnMes; $d++)
             @php
-                $fecha  = \Carbon\Carbon::create($anioNum, $mesNum, $d);
-                $dow    = $fecha->dayOfWeek;
-                $idx    = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
-                $finde  = $idx >= 5;
-                $turno  = $turnosPorDia[$d] ?? null;
-                $codigo = $turno?->codigo_turno ?? '';
-                $esHoy  = ($d === now()->day && $mesNum === now()->month && $anioNum === now()->year);
-                $cbClass= $cbCls[$codigo] ?? 'cb-vacio';
+                $fecha     = \Carbon\Carbon::create($anioNum, $mesNum, $d);
+                $dow       = $fecha->dayOfWeek;
+                $idx       = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
+                $finde     = $idx >= 5;
+                $turnosDia = ($turnosPorDia[$d] ?? collect())->filter(fn($t) => filled($t->codigo_turno));
+                $esHoy     = ($d === now()->day && $mesNum === now()->month && $anioNum === now()->year);
             @endphp
             <div class="cal-cell {{ $finde ? 'finde' : '' }} {{ $esHoy ? 'hoy' : '' }}">
                 <span class="cal-num">{{ $d }}</span>
-                @if($codigo)
-                <span class="cal-badge {{ $cbClass }}">{{ $codigo }}</span>
+                @if($turnosDia->isNotEmpty())
+                <div class="cal-badges">
+                    @foreach($turnosDia as $turno)
+                    <span class="cal-badge {{ $cbCls[$turno->codigo_turno] ?? 'cb-vacio' }}">{{ $turno->codigo_turno }}</span>
+                    @endforeach
+                </div>
                 @endif
             </div>
             @endfor
@@ -232,7 +240,7 @@
 
         {{-- Leyenda --}}
         <div class="d-flex flex-wrap gap-1 mt-3">
-            @foreach(['M','T','MT','N','MTN','MN'] as $c)
+            @foreach(['M','T','MT','N','TN','MTN','MN'] as $c)
             <span class="cal-badge {{ $cbCls[$c] }}">{{ $c }}</span>
             @endforeach
         </div>

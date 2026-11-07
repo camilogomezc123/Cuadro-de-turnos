@@ -81,7 +81,7 @@ class TurnoMedico extends Model
 
     public function esTurnoActivo(): bool
     {
-        return in_array($this->codigo_turno, ['M','T','MT','N','MTN','MN'])
+        return in_array($this->codigo_turno, ['M','T','MT','N','TN','MTN','MN'])
             && $this->fue_laborado
             && !in_array($this->estado_turno, ['no_asistido','cancelado','descubierto']);
     }
