@@ -207,30 +207,29 @@
                 @endfor
                 @foreach($calendario as $dNum => $info)
                 @php
-                    $dow    = $info['dia_sem'];
-                    $esFin  = in_array($dow,[0,6]);
-                    $esHoy  = \Carbon\Carbon::parse($info['fecha'])->isToday();
-                    $turno  = $info['turno'];
-                    $codigo = $turno?->codigo_turno ?? '';
+                    $dow       = $info['dia_sem'];
+                    $esFin     = in_array($dow,[0,6]);
+                    $esHoy     = \Carbon\Carbon::parse($info['fecha'])->isToday();
+                    $turnosDia = $info['turnos']->filter(fn($t) => filled($t->codigo_turno));
                 @endphp
                 <div class="col">
                     <div class="cal-cell {{ $esFin?'weekend':'' }} {{ $esHoy?'today':'' }}">
                         <span class="dia-let">{{ ['Do','Lu','Ma','Mi','Ju','Vi','Sá'][$dow] }}</span>
                         <span class="day-num">{{ $dNum }}</span>
-                        @if($codigo)
-                            <span class="shift-badge t-{{ $codigo }} d-block mt-1" style="font-size:.65rem">{{ $codigo }}</span>
-                            @if($turno && $turno->esTurnoActivo() && \Carbon\Carbon::parse($info['fecha'])->startOfDay()->gte(\Carbon\Carbon::today()))
-                                <button class="btn btn-link p-0 mt-1" style="font-size:.58rem;color:#f59e0b"
-                                        onclick="abrirOfrecer({{ $turno->id }},'{{ $info['fecha'] }}','{{ $codigo }}')">
+                        @forelse($turnosDia as $turno)
+                            <span class="shift-badge t-{{ $turno->codigo_turno }} d-block mt-1" style="font-size:.6rem">{{ $turno->codigo_turno }}</span>
+                            @if($turno->uci)
+                                <span class="d-block" style="font-size:.5rem;color:#9aa5c0">{{ $turno->uci->codigo }}</span>
+                            @endif
+                            @if($turno->esTurnoActivo() && \Carbon\Carbon::parse($info['fecha'])->startOfDay()->gte(\Carbon\Carbon::today()))
+                                <button class="btn btn-link p-0" style="font-size:.55rem;color:#f59e0b;line-height:1.2"
+                                        onclick="abrirOfrecer({{ $turno->id }},'{{ $info['fecha'] }}','{{ $turno->codigo_turno }}')">
                                     Ofrecer
                                 </button>
                             @endif
-                        @else
+                        @empty
                             <span class="text-muted" style="font-size:.6rem">libre</span>
-                        @endif
-                        @if($turno?->uci)
-                            <span class="d-block" style="font-size:.55rem;color:#9aa5c0">{{ $turno->uci->codigo }}</span>
-                        @endif
+                        @endforelse
                     </div>
                 </div>
                 @endforeach

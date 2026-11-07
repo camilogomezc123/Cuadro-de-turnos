@@ -89,8 +89,11 @@ class MedicoPortalController extends Controller
             ->filter(function ($sol) use ($medico) {
                 $turno = $sol->turnoOrigen;
                 if (!$turno) return false;
+                // Solo se oculta si ya tiene turno ESE DÍA EN ESA MISMA UCI; trabajar
+                // en varias UCIs distintas el mismo día está permitido.
                 return !TurnoMedico::where('medico_id', $medico->id)
                     ->where('fecha', $turno->fecha)
+                    ->where('uci_id', $turno->uci_id)
                     ->where('fue_laborado', true)
                     ->whereNotIn('codigo_turno', ['','LIBRE'])
                     ->exists();
@@ -114,12 +117,13 @@ class MedicoPortalController extends Controller
         $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
         $calendario = [];
         for ($d = 1; $d <= $diasEnMes; $d++) {
-            $fecha = Carbon::create($anio, $mes, $d)->toDateString();
-            $turno = $misTurnos->first(fn($t) => $t->fecha->toDateString() === $fecha);
+            $fecha  = Carbon::create($anio, $mes, $d)->toDateString();
+            // Un médico puede tener más de un turno ese día (multi-UCI): se listan todos, no solo el primero.
+            $turnos = $misTurnos->filter(fn($t) => $t->fecha->toDateString() === $fecha)->values();
             $calendario[$d] = [
                 'fecha'   => $fecha,
                 'dia_sem' => Carbon::create($anio,$mes,$d)->dayOfWeek,
-                'turno'   => $turno,
+                'turnos'  => $turnos,
                 'pasado'  => Carbon::parse($fecha)->isPast(),
             ];
         }
@@ -186,7 +190,7 @@ class MedicoPortalController extends Controller
         }
 
         $turno = $solicitud->turnoOrigen;
-        $check = $this->conflictoService->validarOferta($medico->id, $turno->fecha, $turno->codigo_turno);
+        $check = $this->conflictoService->validarOferta($medico->id, $turno->fecha, $turno->codigo_turno, $turno->uci_id);
 
         if ($check['tiene_conflicto']) {
             return back()->with('error', implode(' ', $check['conflictos']));
@@ -485,12 +489,15 @@ class MedicoPortalController extends Controller
                 ])
                 ->values();
         } else {
-            // Para donación: cualquier médico activo (sin turno en ese día o con libre)
-            $fecha = $turnoId ? (TurnoMedico::find($turnoId)?->fecha ?? now()->toDateString()) : now()->toDateString();
+            // Para donación: cualquier médico activo (sin turno ese día en esa misma UCI).
+            // Trabajar en varias UCIs distintas el mismo día está permitido.
+            $turnoOrigenDonacion = $turnoId ? TurnoMedico::find($turnoId) : null;
+            $fecha = $turnoOrigenDonacion?->fecha ?? now()->toDateString();
 
             $medicosConTurno = TurnoMedico::where('fecha', $fecha)
                 ->where('medico_id', '!=', $medico->id)
                 ->whereNotIn('codigo_turno', ['', 'LIBRE', 'VAC'])
+                ->when($turnoOrigenDonacion, fn($q) => $q->where('uci_id', $turnoOrigenDonacion->uci_id))
                 ->pluck('medico_id');
 
             $candidatos = Medico::where('activo', true)
