@@ -733,7 +733,7 @@ setTimeout(() => {
                 <div id="botonesNormales" class="w-100 d-flex gap-2">
                     <button type="button"
                             class="btn btn-primary flex-fill fw-semibold py-2"
-                            onclick="enviarConsentimiento('aceptar')">
+                            onclick="enviarConsentimiento(event, 'aceptar')">
                         <i class="bi bi-check2-circle me-1"></i>Acepto y continúo
                     </button>
                     <button type="button"
@@ -751,7 +751,7 @@ setTimeout(() => {
                     </button>
                     <button type="button"
                             class="btn btn-danger flex-fill fw-semibold py-2"
-                            onclick="enviarConsentimiento('rechazar')">
+                            onclick="enviarConsentimiento(event, 'rechazar')">
                         <i class="bi bi-x-circle me-1"></i>Confirmar rechazo
                     </button>
                 </div>
@@ -768,7 +768,7 @@ setTimeout(() => {
     // Si también falta completar el perfil, se muestra apenas se cierre este modal
     el.addEventListener('hidden.bs.modal', function() {
         const perfilEl = document.getElementById('modalPerfilMedico');
-        if (perfilEl) new bootstrap.Modal(perfilEl).show();
+        if (perfilEl) bootstrap.Modal.getOrCreateInstance(perfilEl).show();
     }, { once: true });
 })();
 
@@ -785,7 +785,7 @@ function ocultarPanelRechazo() {
     document.getElementById('botonesNormales').style.removeProperty('display');
 }
 
-async function enviarConsentimiento(accion) {
+async function enviarConsentimiento(event, accion) {
     const btn = event.currentTarget;
     btn.disabled = true;
 
@@ -807,15 +807,24 @@ async function enviarConsentimiento(accion) {
             },
             body,
         });
-        const data = await resp.json();
 
+        // Sesión/token vencidos: recargar para que el servidor redirija al login
+        if (resp.status === 401 || resp.status === 403 || resp.status === 419) {
+            window.location.reload();
+            return;
+        }
+
+        const data = await resp.json();
         if (data.redirect) {
             window.location.href = data.redirect;
             return;
         }
-    } catch(e) { /* continuar igual */ }
+    } catch(e) {
+        btn.disabled = false;
+        return;
+    }
 
-    bootstrap.Modal.getInstance(document.getElementById('modalConsentimiento')).hide();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalConsentimiento')).hide();
 }
 </script>
 @endif
@@ -859,7 +868,7 @@ async function enviarConsentimiento(accion) {
             </div>
 
             <div class="modal-footer border-0 px-4 pb-4 pt-0">
-                <button type="button" class="btn btn-primary w-100 fw-semibold py-2" onclick="enviarPerfilMedico()">
+                <button type="button" class="btn btn-primary w-100 fw-semibold py-2" onclick="enviarPerfilMedico(event)">
                     <i class="bi bi-check2-circle me-1"></i>Guardar y continuar
                 </button>
             </div>
@@ -870,11 +879,11 @@ async function enviarConsentimiento(accion) {
 <script>
 (function() {
     if (!document.getElementById('modalConsentimiento')) {
-        new bootstrap.Modal(document.getElementById('modalPerfilMedico')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPerfilMedico')).show();
     }
 })();
 
-async function enviarPerfilMedico() {
+async function enviarPerfilMedico(event) {
     const btn          = event.currentTarget;
     const documento    = document.getElementById('perfilDocumento').value.trim();
     const especialidad = document.getElementById('perfilEspecialidad').value;
@@ -898,15 +907,29 @@ async function enviarPerfilMedico() {
             },
             body: JSON.stringify({ documento, especialidad }),
         });
+
+        // Sesión/token vencidos: recargar para que el servidor pida iniciar sesión de nuevo
+        if (resp.status === 401 || resp.status === 403 || resp.status === 419) {
+            window.location.reload();
+            return;
+        }
+
         if (!resp.ok) {
-            errorBox.textContent = 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
+            let mensaje = 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
+            try {
+                const data = await resp.json();
+                const primerError = data?.errors ? Object.values(data.errors)[0]?.[0] : null;
+                mensaje = primerError || data?.message || mensaje;
+            } catch (e) { /* respuesta sin JSON, se usa el mensaje genérico */ }
+            errorBox.textContent = mensaje;
             errorBox.style.display = '';
             btn.disabled = false;
             return;
         }
-        bootstrap.Modal.getInstance(document.getElementById('modalPerfilMedico')).hide();
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPerfilMedico')).hide();
     } catch (e) {
-        errorBox.textContent = 'Error de conexión. Intenta de nuevo.';
+        errorBox.textContent = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
         errorBox.style.display = '';
         btn.disabled = false;
     }
