@@ -33,6 +33,7 @@ Route::post('/logout',[AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::post('/consentimiento/aceptar',  [AuthController::class, 'aceptarConsentimiento']) ->name('consentimiento.aceptar');
     Route::post('/consentimiento/rechazar', [AuthController::class, 'rechazarConsentimiento'])->name('consentimiento.rechazar');
+    Route::post('/perfil-medico/completar', [AuthController::class, 'completarPerfilMedico'])->name('perfil-medico.completar');
 });
 
 // ── Portal médico ───────────────────────────────────────────────

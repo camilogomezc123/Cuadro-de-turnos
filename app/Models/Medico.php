@@ -13,9 +13,27 @@ class Medico extends Model
     use Notifiable;
 
     protected $fillable = [
-        'nombre', 'apellido', 'documento', 'email', 'telefono',
+        'nombre', 'apellido', 'documento', 'especialidad', 'email', 'telefono',
         'uci_id', 'activo', 'puede_ingresar_sistema', 'fecha_creacion_usuario',
     ];
+
+    // Catálogo fijo de especialidades (código-nombre, como aparece en el cronograma de coordinación)
+    const ESPECIALIDADES = [
+        '011-MEDICINA INTERNA'    => '011-MEDICINA INTERNA',
+        '059-MEDICO INTENSIVISTA' => '059-MEDICO INTENSIVISTA',
+        '164-URGENCIOLOGÍA'       => '164-URGENCIOLOGÍA',
+        'CIRUGIA GENERAL'        => 'CIRUGIA GENERAL',
+    ];
+
+    public function tienePerfilCompleto(): bool
+    {
+        return filled($this->documento) && filled($this->especialidad);
+    }
+
+    public function getDocumentoFormateadoAttribute(): string
+    {
+        return $this->documento ? "CC-{$this->documento}" : '';
+    }
 
     protected $casts = [
         'activo'                 => 'boolean',

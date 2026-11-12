@@ -762,8 +762,14 @@ setTimeout(() => {
 </div>
 <script>
 (function() {
-    const modal = new bootstrap.Modal(document.getElementById('modalConsentimiento'));
+    const el    = document.getElementById('modalConsentimiento');
+    const modal = new bootstrap.Modal(el);
     modal.show();
+    // Si también falta completar el perfil, se muestra apenas se cierre este modal
+    el.addEventListener('hidden.bs.modal', function() {
+        const perfilEl = document.getElementById('modalPerfilMedico');
+        if (perfilEl) new bootstrap.Modal(perfilEl).show();
+    }, { once: true });
 })();
 
 function mostrarPanelRechazo() {
@@ -810,6 +816,100 @@ async function enviarConsentimiento(accion) {
     } catch(e) { /* continuar igual */ }
 
     bootstrap.Modal.getInstance(document.getElementById('modalConsentimiento')).hide();
+}
+</script>
+@endif
+
+@if(session('perfil_pendiente') && auth()->user()->esMedico())
+{{-- ── Modal de datos pendientes (cédula / especialidad) — solo médicos ── --}}
+<div class="modal fade" id="modalPerfilMedico" tabindex="-1"
+     data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblPerfilMedico">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
+        <div class="modal-content border-0 shadow-lg">
+
+            <div class="modal-header border-0 pb-2 px-4 pt-4"
+                 style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-person-badge fs-5 text-white"></i>
+                    <h5 class="modal-title text-white mb-0 fw-semibold" id="lblPerfilMedico" style="font-size:.95rem">
+                        Completa tu información antes de continuar
+                    </h5>
+                </div>
+            </div>
+
+            <div class="modal-body px-4 py-3">
+                <p class="text-muted mb-3" style="font-size:.85rem">
+                    Necesitamos tu cédula y especialidad para generar correctamente el cronograma consolidado.
+                </p>
+                <div id="errorPerfilMedico" class="alert alert-danger py-2 small mb-3" style="display:none"></div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small mb-1">Cédula</label>
+                    <input type="text" id="perfilDocumento" class="form-control" maxlength="30" placeholder="Ej: 94404963">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold small mb-1">Especialidad</label>
+                    <select id="perfilEspecialidad" class="form-select">
+                        <option value="">Selecciona tu especialidad…</option>
+                        @foreach(\App\Models\Medico::ESPECIALIDADES as $valor => $label)
+                            <option value="{{ $valor }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-footer border-0 px-4 pb-4 pt-0">
+                <button type="button" class="btn btn-primary w-100 fw-semibold py-2" onclick="enviarPerfilMedico()">
+                    <i class="bi bi-check2-circle me-1"></i>Guardar y continuar
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    if (!document.getElementById('modalConsentimiento')) {
+        new bootstrap.Modal(document.getElementById('modalPerfilMedico')).show();
+    }
+})();
+
+async function enviarPerfilMedico() {
+    const btn          = event.currentTarget;
+    const documento    = document.getElementById('perfilDocumento').value.trim();
+    const especialidad = document.getElementById('perfilEspecialidad').value;
+    const errorBox      = document.getElementById('errorPerfilMedico');
+    errorBox.style.display = 'none';
+
+    if (!documento || !especialidad) {
+        errorBox.textContent = 'Completa la cédula y la especialidad para continuar.';
+        errorBox.style.display = '';
+        return;
+    }
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch('{{ route('perfil-medico.completar') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ documento, especialidad }),
+        });
+        if (!resp.ok) {
+            errorBox.textContent = 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
+            errorBox.style.display = '';
+            btn.disabled = false;
+            return;
+        }
+        bootstrap.Modal.getInstance(document.getElementById('modalPerfilMedico')).hide();
+    } catch (e) {
+        errorBox.textContent = 'Error de conexión. Intenta de nuevo.';
+        errorBox.style.display = '';
+        btn.disabled = false;
+    }
 }
 </script>
 @endif

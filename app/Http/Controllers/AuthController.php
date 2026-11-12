@@ -30,6 +30,9 @@ class AuthController extends Controller
 
             // Médicos van directo a su portal personal
             if ($user->esMedico()) {
+                if ($user->medico && !$user->medico->tienePerfilCompleto()) {
+                    $request->session()->put('perfil_pendiente', true);
+                }
                 return redirect()->route('medico.portal');
             }
 
@@ -61,6 +64,27 @@ class AuthController extends Controller
             'Usuario aceptó el aviso de uso de la plataforma',
             $user->name
         );
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function completarPerfilMedico(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user->esMedico() || !$user->medico) {
+            abort(403);
+        }
+
+        $request->validate([
+            'documento'    => 'required|string|max:30',
+            'especialidad' => 'required|string|in:' . implode(',', array_keys(Medico::ESPECIALIDADES)),
+        ]);
+
+        $user->medico->update([
+            'documento'    => $request->documento,
+            'especialidad' => $request->especialidad,
+        ]);
+        $request->session()->forget('perfil_pendiente');
 
         return response()->json(['ok' => true]);
     }

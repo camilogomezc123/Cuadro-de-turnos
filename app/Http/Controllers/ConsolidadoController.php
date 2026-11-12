@@ -115,6 +115,7 @@ class ConsolidadoController extends Controller
 
         $spreadsheet = new Spreadsheet();
         $this->hojaConsolidadoMedicos($spreadsheet, $mes, $anio);
+        $this->hojaCronogramaCompleto($spreadsheet, $mes, $anio);
         $this->hojaConsolidadoUcis($spreadsheet, $mes, $anio);
         $this->hojaAlertas($spreadsheet, $mes, $anio);
         $this->hojaNovedades($spreadsheet, $mes, $anio);
@@ -224,6 +225,70 @@ class ConsolidadoController extends Controller
         $sheet->getColumnDimensionByColumn(2)->setWidth(15);
         for ($c = 3; $c <= count($headers); $c++) {
             $sheet->getColumnDimensionByColumn($c)->setWidth(12);
+        }
+    }
+
+    // ── Excel: Cronograma completo (formato cédula + especialidad + días) ──
+    // Igual al formato del archivo de coordinación; se genera en vivo contra
+    // la base de datos, así que cualquier cambio de turno queda reflejado
+    // de inmediato en la próxima descarga.
+    private function hojaCronogramaCompleto(Spreadsheet $ss, int $mes, int $anio): void
+    {
+        $sheet = $ss->createSheet();
+        $sheet->setTitle('Cronograma Completo');
+
+        $diasEnMes = cal_days_in_month(CAL_GREGORIAN, $mes, $anio);
+        $nombreMes = Carbon::create($anio, $mes, 1)->locale('es')->monthName;
+
+        $headers = ['#', 'MEDICO', 'ESPECIALIDAD'];
+        for ($d = 1; $d <= $diasEnMes; $d++) {
+            $headers[] = (string)$d;
+        }
+
+        $sheet->setCellValue([1,1], "CRONOGRAMA — {$nombreMes} {$anio}");
+        $this->estiloTitulo($sheet, 'A1', count($headers));
+        foreach ($headers as $col => $h) {
+            $sheet->setCellValue([$col+1, 2], $h);
+        }
+        $this->estiloEncabezado($sheet, 2, count($headers));
+
+        $archivos = ArchivoCargado::where('procesado', true)
+            ->where('anio', $anio)->where('mes', $mes)->pluck('id');
+
+        // Turnos reales de laborado, agrupados por médico → día (un médico puede
+        // tener más de un turno el mismo día si trabaja en varias UCIs)
+        $turnosPorMedico = TurnoMedico::whereIn('archivo_id', $archivos)
+            ->where('fue_laborado', true)
+            ->whereNotIn('codigo_turno', ['', 'LIBRE'])
+            ->get()
+            ->groupBy('medico_id');
+
+        $medicos = Medico::where('activo', true)
+            ->orderBy('nombre')->orderBy('apellido')->get();
+
+        $fila = 3;
+        foreach ($medicos as $i => $medico) {
+            $sheet->setCellValue([1, $fila], $i + 1);
+            $nombreCol = trim($medico->documento_formateado . ' ' . $medico->nombre_completo);
+            $sheet->setCellValue([2, $fila], $nombreCol);
+            $sheet->setCellValue([3, $fila], $medico->especialidad ?: '-');
+
+            $turnosPorDia = ($turnosPorMedico->get($medico->id) ?? collect())->groupBy('dia_numero');
+
+            for ($d = 1; $d <= $diasEnMes; $d++) {
+                $codigos = ($turnosPorDia->get($d) ?? collect())
+                    ->pluck('codigo_turno')->filter()->unique()->implode(' / ');
+                $sheet->setCellValue([3 + $d, $fila], $codigos !== '' ? $codigos : 'LIBRE');
+            }
+
+            $fila++;
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(5);
+        $sheet->getColumnDimension('B')->setWidth(34);
+        $sheet->getColumnDimension('C')->setWidth(24);
+        for ($c = 4; $c <= count($headers); $c++) {
+            $sheet->getColumnDimensionByColumn($c)->setWidth(7);
         }
     }
 
