@@ -825,7 +825,9 @@ async function enviarConsentimiento(accion) {
 <div class="modal fade" id="modalPerfilMedico" tabindex="-1"
      data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblPerfilMedico">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
-        <form id="formPerfilMedico" class="modal-content border-0 shadow-lg">
+        <form id="formPerfilMedico" class="modal-content border-0 shadow-lg"
+              method="POST" action="{{ route('perfil-medico.completar', [], false) }}">
+            @csrf
 
             <div class="modal-header border-0 pb-2 px-4 pt-4"
                  style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
@@ -841,18 +843,22 @@ async function enviarConsentimiento(accion) {
                 <p class="text-muted mb-3" style="font-size:.85rem">
                     Necesitamos tu cédula y especialidad para generar correctamente el cronograma consolidado.
                 </p>
-                <div id="errorPerfilMedico" class="alert alert-danger py-2 small mb-3" style="display:none"></div>
+                @foreach(['documento', 'especialidad'] as $campo)
+                    @error($campo)
+                        <div class="alert alert-danger py-2 small mb-3" role="alert">{{ $message }}</div>
+                    @enderror
+                @endforeach
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold small mb-1">Cédula</label>
-                    <input type="text" id="perfilDocumento" class="form-control" maxlength="30" value="{{ auth()->user()->medico?->documento }}" required>
+                    <input type="text" id="perfilDocumento" name="documento" class="form-control" maxlength="30" value="{{ old('documento', auth()->user()->medico?->documento) }}" required>
                 </div>
                 <div class="mb-2">
                     <label class="form-label fw-semibold small mb-1">Especialidad</label>
-                    <select id="perfilEspecialidad" class="form-select" required>
+                    <select id="perfilEspecialidad" name="especialidad" class="form-select" required>
                         <option value="">Selecciona tu especialidad…</option>
                         @foreach(\App\Models\Medico::ESPECIALIDADES as $valor => $label)
-                            <option value="{{ $valor }}" @selected(auth()->user()->medico?->especialidad === $valor)>{{ $label }}</option>
+                            <option value="{{ $valor }}" @selected(old('especialidad', auth()->user()->medico?->especialidad) === $valor)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -873,49 +879,6 @@ async function enviarConsentimiento(accion) {
         new bootstrap.Modal(document.getElementById('modalPerfilMedico')).show();
     }
 })();
-
-document.getElementById('formPerfilMedico').addEventListener('submit', async function (event) {
-    event.preventDefault();
-    const btn = event.currentTarget.querySelector('button[type="submit"]');
-    const documento    = document.getElementById('perfilDocumento').value.trim();
-    const especialidad = document.getElementById('perfilEspecialidad').value;
-    const errorBox      = document.getElementById('errorPerfilMedico');
-    errorBox.style.display = 'none';
-
-    if (!documento || !especialidad) {
-        errorBox.textContent = 'Completa la cédula y la especialidad para continuar.';
-        errorBox.style.display = '';
-        return;
-    }
-
-    btn.disabled = true;
-    try {
-        const resp = await fetch('{{ route('perfil-medico.completar') }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ documento, especialidad }),
-        });
-        if (!resp.ok) {
-            const data = await resp.json().catch(() => null);
-            const validation = Object.values(data?.errors ?? {}).flat()[0];
-            errorBox.textContent = resp.status === 419
-                ? 'Tu sesión expiró. Recarga la página e intenta de nuevo.'
-                : validation || 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
-            errorBox.style.display = '';
-            btn.disabled = false;
-            return;
-        }
-        bootstrap.Modal.getInstance(document.getElementById('modalPerfilMedico')).hide();
-    } catch (e) {
-        errorBox.textContent = 'Error de conexión. Intenta de nuevo.';
-        errorBox.style.display = '';
-        btn.disabled = false;
-    }
-});
 </script>
 @endif
 @endauth
