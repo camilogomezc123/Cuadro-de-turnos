@@ -825,7 +825,7 @@ async function enviarConsentimiento(accion) {
 <div class="modal fade" id="modalPerfilMedico" tabindex="-1"
      data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblPerfilMedico">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
-        <div class="modal-content border-0 shadow-lg">
+        <form id="formPerfilMedico" class="modal-content border-0 shadow-lg">
 
             <div class="modal-header border-0 pb-2 px-4 pt-4"
                  style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
@@ -845,26 +845,26 @@ async function enviarConsentimiento(accion) {
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold small mb-1">Cédula</label>
-                    <input type="text" id="perfilDocumento" class="form-control" maxlength="30" placeholder="Ej: 94404963">
+                    <input type="text" id="perfilDocumento" class="form-control" maxlength="30" value="{{ auth()->user()->medico?->documento }}" required>
                 </div>
                 <div class="mb-2">
                     <label class="form-label fw-semibold small mb-1">Especialidad</label>
-                    <select id="perfilEspecialidad" class="form-select">
+                    <select id="perfilEspecialidad" class="form-select" required>
                         <option value="">Selecciona tu especialidad…</option>
                         @foreach(\App\Models\Medico::ESPECIALIDADES as $valor => $label)
-                            <option value="{{ $valor }}">{{ $label }}</option>
+                            <option value="{{ $valor }}" @selected(auth()->user()->medico?->especialidad === $valor)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
 
             <div class="modal-footer border-0 px-4 pb-4 pt-0">
-                <button type="button" class="btn btn-primary w-100 fw-semibold py-2" onclick="enviarPerfilMedico()">
+                <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
                     <i class="bi bi-check2-circle me-1"></i>Guardar y continuar
                 </button>
             </div>
 
-        </div>
+        </form>
     </div>
 </div>
 <script>
@@ -874,8 +874,9 @@ async function enviarConsentimiento(accion) {
     }
 })();
 
-async function enviarPerfilMedico() {
-    const btn          = event.currentTarget;
+document.getElementById('formPerfilMedico').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const btn = event.currentTarget.querySelector('button[type="submit"]');
     const documento    = document.getElementById('perfilDocumento').value.trim();
     const especialidad = document.getElementById('perfilEspecialidad').value;
     const errorBox      = document.getElementById('errorPerfilMedico');
@@ -899,7 +900,11 @@ async function enviarPerfilMedico() {
             body: JSON.stringify({ documento, especialidad }),
         });
         if (!resp.ok) {
-            errorBox.textContent = 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
+            const data = await resp.json().catch(() => null);
+            const validation = Object.values(data?.errors ?? {}).flat()[0];
+            errorBox.textContent = resp.status === 419
+                ? 'Tu sesión expiró. Recarga la página e intenta de nuevo.'
+                : validation || 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
             errorBox.style.display = '';
             btn.disabled = false;
             return;
@@ -910,7 +915,7 @@ async function enviarPerfilMedico() {
         errorBox.style.display = '';
         btn.disabled = false;
     }
-}
+});
 </script>
 @endif
 @endauth
