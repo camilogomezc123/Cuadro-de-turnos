@@ -66,11 +66,11 @@ class MedicoController extends Controller
 
         // Indicador calculado del mes
         $indicador = [
-            'total_horas'      => $turnos->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->sum('horas_total'),
+            'total_horas'      => $turnos->whereIn('codigo_turno',['M','T','MT','N','TN','MTN','MN'])->sum('horas_total'),
             'horas_nocturnas'  => $turnos->sum('horas_nocturnas'),
-            'total_turnos'     => $turnos->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->count(),
-            'fines_semana'     => $turnos->where('es_fin_semana', true)->whereIn('codigo_turno',['M','T','MT','N','MTN','MN'])->count(),
-            'turnos_nocturnos' => $turnos->whereIn('codigo_turno',['N','MTN','MN'])->count(),
+            'total_turnos'     => $turnos->whereIn('codigo_turno',['M','T','MT','N','TN','MTN','MN'])->count(),
+            'fines_semana'     => $turnos->where('es_fin_semana', true)->whereIn('codigo_turno',['M','T','MT','N','TN','MTN','MN'])->count(),
+            'turnos_nocturnos' => $turnos->whereIn('codigo_turno',['N','TN','MTN','MN'])->count(),
         ];
         $indicador['supera_200h']  = $indicador['total_horas'] > 200;
         $indicador['horas_diurnas']= $indicador['total_horas'] - $indicador['horas_nocturnas'];

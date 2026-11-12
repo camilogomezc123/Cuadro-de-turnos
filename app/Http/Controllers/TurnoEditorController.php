@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\DB;
 
 class TurnoEditorController extends Controller
 {
-    const CODIGOS   = ['M','T','MT','N','MTN','MN','VAC','PER','INC',''];
-    const HORAS_MAP = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'MTN'=>24,'MN'=>18,'VAC'=>0,'PER'=>0,'INC'=>0,''=>0];
+    const CODIGOS   = ['M','T','MT','N','TN','MTN','MN','VAC','PER','INC',''];
+    const HORAS_MAP = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'TN'=>18,'MTN'=>24,'MN'=>18,'VAC'=>0,'PER'=>0,'INC'=>0,''=>0];
+    const CODIGOS_NOCTURNOS = ['N','TN','MTN','MN'];
     const DIAS_SEMANA = ['L','M','M','J','V','S','D']; // Lun=0 … Dom=6
 
     public function __construct(
@@ -140,8 +141,8 @@ class TurnoEditorController extends Controller
                         'dia_numero'      => $d,
                         'dia_semana'      => $this->nombreDiaSemana($idx),
                         'codigo_turno'    => $codigo,
-                        'horas_diurnas'   => in_array($codigo, ['M','T','MT','MTN']) ? min($horas, 12) : 0,
-                        'horas_nocturnas' => in_array($codigo, ['N','MTN','MN'])     ? ($codigo==='MTN'?12:($codigo==='MN'?12:12)) : 0,
+                        'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                        'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                         'horas_total'     => $horas,
                         'es_fin_semana'   => $esFinde,
                         'es_domingo'      => ($dow === 0),
@@ -261,8 +262,8 @@ class TurnoEditorController extends Controller
                                 'dia_numero'      => $d,
                                 'dia_semana'      => $this->nombreDiaSemana($idx),
                                 'codigo_turno'    => $codigo,
-                                'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
-                                'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                                'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                                'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                                 'horas_total'     => $horas,
                                 'es_fin_semana'   => in_array($dow, [0,6]),
                                 'es_domingo'      => ($dow === 0),
@@ -371,8 +372,8 @@ class TurnoEditorController extends Controller
                     'dia_numero'     => $d,
                     'dia_semana'     => $this->nombreDiaSemana($idx),
                     'codigo_turno'   => $codigo,
-                    'horas_diurnas'  => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12):0,
-                    'horas_nocturnas'=> in_array($codigo,['N','MTN','MN'])     ? 12:0,
+                    'horas_diurnas'  => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                    'horas_nocturnas'=> in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                     'horas_total'    => $horas,
                     'es_fin_semana'  => in_array($dow,[0,6]),
                     'es_domingo'     => ($dow===0),
@@ -444,8 +445,8 @@ class TurnoEditorController extends Controller
             if ($turno) {
                 $turno->update([
                     'codigo_turno'    => $codigo,
-                    'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
-                    'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                    'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                    'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                     'horas_total'     => $horas,
                     'es_fin_semana'   => in_array($dow,[0,6]),
                     'es_domingo'      => ($dow===0),
@@ -467,8 +468,8 @@ class TurnoEditorController extends Controller
                     'dia_numero'      => $fecha->day,
                     'dia_semana'      => $this->nombreDiaSemana($idx),
                     'codigo_turno'    => $codigo,
-                    'horas_diurnas'   => in_array($codigo,['M','T','MT','MTN']) ? min($horas,12) : 0,
-                    'horas_nocturnas' => in_array($codigo,['N','MTN','MN'])     ? 12 : 0,
+                    'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                    'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                     'horas_total'     => $horas,
                     'es_fin_semana'   => in_array($dow,[0,6]),
                     'es_domingo'      => ($dow===0),
@@ -514,8 +515,8 @@ class TurnoEditorController extends Controller
                     [
                         'dia_numero'=>$turno->dia_numero,'dia_semana'=>$turno->dia_semana,
                         'codigo_turno'=>$codigoNuevo,
-                        'horas_diurnas'=>in_array($codigoNuevo,['M','T','MT','MTN'])?min($horas,12):0,
-                        'horas_nocturnas'=>in_array($codigoNuevo,['N','MTN','MN'])?12:0,
+                        'horas_diurnas'=>max($horas - (in_array($codigoNuevo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
+                        'horas_nocturnas'=>in_array($codigoNuevo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
                         'horas_total'=>$horas,
                         'es_fin_semana'=>$turno->es_fin_semana,'es_domingo'=>$turno->es_domingo,
                     ]

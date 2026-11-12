@@ -35,7 +35,7 @@ class AlertaTurno extends Model
         'TURNO_EN_AUSENCIA'      => 'Turno asignado en período de ausencia',
         'MTN_DIA_HABIL'            => 'MTN en día hábil (lunes a viernes)',
         'JORNADA_24H_HABIL'        => 'Jornada mayor a 24h en día hábil',
-        'CODIGO_NO_PARAMETRIZADO'  => 'Código de turno no parametrizado (ej: MN)',
+        'CODIGO_NO_PARAMETRIZADO'  => 'Código de turno no parametrizado',
         'EXCESO_200H'              => 'Exceso de 200 horas mensuales',
         'EXCESO_12H_HABIL'         => 'Más de 12 horas en día hábil',
     ];

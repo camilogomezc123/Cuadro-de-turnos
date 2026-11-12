@@ -111,16 +111,16 @@ class TurnoCalculatorService
             $horasDiurnas   += $t['horas_diurnas'];
             $horasNocturnas += $t['horas_nocturnas'];
 
-            // MN y MTN cuentan como M+N y MT+N respectivamente
-            match ($t['codigo_turno']) {
-                'M'   => $turnosM++,
-                'T'   => $turnosT++,
-                'MT'  => $turnosMT++,
-                'N'   => $turnosN++,
-                'MN'  => ($turnosM++ && $turnosN++),
-                'MTN' => ($turnosMT++ && $turnosN++),
-                default => null,
-            };
+            // MN, TN y MTN cuentan como M+N, T+N y MT+N respectivamente
+            switch ($t['codigo_turno']) {
+                case 'M':   $turnosM++; break;
+                case 'T':   $turnosT++; break;
+                case 'MT':  $turnosMT++; break;
+                case 'N':   $turnosN++; break;
+                case 'MN':  $turnosM++;  $turnosN++; break;
+                case 'TN':  $turnosT++;  $turnosN++; break;
+                case 'MTN': $turnosMT++; $turnosN++; break;
+            }
 
             if ($t['horas_total'] > 0 && $t['es_fin_semana']) $turnosFinde++;
             if ($t['horas_total'] > 0 && $t['es_domingo'])    $turnosDomingo++;

@@ -135,20 +135,23 @@ class AlertService
             if ($t->codigo_turno !== 'MTN') continue;
             $fecha = Carbon::parse($t->fecha);
             if (!in_array($fecha->dayOfWeek, [0, 6])) {
-                $count += $this->crearAlerta($archivoId, $medico->id, $uciId, $t->fecha, 'MTN_DIA_HABIL', 'alta',
+                $count += $this->crearAlerta($archivoId, $medico->id, $t->uci_id, $t->fecha, 'MTN_DIA_HABIL', 'alta',
                     "El médico {$nombre} tiene turno MTN en día hábil ({$fecha->format('d/m/Y')}). MTN solo está permitido sábados y domingos.");
             }
         }
 
-        // 4. Noche seguida de mañana (N un día, M/MT/MTN al día siguiente)
-        $turnosPorFecha = $turnos->keyBy(fn($t) => $t->fecha->toDateString());
+        // 4. Noche seguida de mañana (N/TN/MTN/MN un día, M/MT/MTN/MN al día siguiente)
+        // Agrupado (no keyBy) porque un médico puede tener más de un turno el mismo día en UCIs distintas.
+        $turnosPorFecha = $turnos->groupBy(fn($t) => $t->fecha->toDateString());
         foreach ($turnos as $t) {
-            if (!in_array($t->codigo_turno, ['N', 'MTN'])) continue;
+            if (!in_array($t->codigo_turno, ['N', 'TN', 'MTN', 'MN'])) continue;
             $siguiente = Carbon::parse($t->fecha)->addDay()->toDateString();
-            $tSig = $turnosPorFecha[$siguiente] ?? null;
-            if ($tSig && in_array($tSig->codigo_turno, ['M', 'MT', 'MTN'])) {
-                $count += $this->crearAlerta($archivoId, $medico->id, $uciId, $tSig->fecha, 'NOCHE_SEGUIDA_MANANA', 'media',
-                    "El médico {$nombre} tiene noche el {$t->fecha->format('d/m')} y turno de mañana el {$tSig->fecha->format('d/m/Y')}. Sin descanso entre turnos.");
+            $turnosSiguiente = $turnosPorFecha->get($siguiente) ?? collect();
+            foreach ($turnosSiguiente as $tSig) {
+                if (in_array($tSig->codigo_turno, ['M', 'MT', 'MTN', 'MN'])) {
+                    $count += $this->crearAlerta($archivoId, $medico->id, $tSig->uci_id, $tSig->fecha, 'NOCHE_SEGUIDA_MANANA', 'media',
+                        "El médico {$nombre} tiene noche el {$t->fecha->format('d/m')} y turno de mañana el {$tSig->fecha->format('d/m/Y')}. Sin descanso entre turnos.");
+                }
             }
         }
 
@@ -158,7 +161,7 @@ class AlertService
             $horasSemana = $turnosSemana->sum('horas_total');
             if ($horasSemana > self::HORAS_MAX_SEMANA) {
                 $fechaRef = $turnosSemana->first()->fecha->format('d/m/Y');
-                $count += $this->crearAlerta($archivoId, $medico->id, $uciId, $fechaRef, 'SEMANA_EXCESIVA', 'alta',
+                $count += $this->crearAlerta($archivoId, $medico->id, $turnosSemana->first()->uci_id, $fechaRef, 'SEMANA_EXCESIVA', 'alta',
                     "El médico {$nombre} tiene {$horasSemana}h en la semana que incluye el {$fechaRef} (máx ".self::HORAS_MAX_SEMANA."h semanales).");
             }
         }
@@ -167,7 +170,7 @@ class AlertService
         foreach ($turnos as $t) {
             if ($t->horas_total == 0) continue;
             if ($this->medicoTieneAusencia($medico->id, Carbon::parse($t->fecha))) {
-                $count += $this->crearAlerta($archivoId, $medico->id, $uciId, $t->fecha, 'TURNO_EN_AUSENCIA', 'alta',
+                $count += $this->crearAlerta($archivoId, $medico->id, $t->uci_id, $t->fecha, 'TURNO_EN_AUSENCIA', 'alta',
                     "El médico {$nombre} tiene una ausencia registrada para el {$t->fecha->format('d/m/Y')}. Validar asignación.");
             }
         }
@@ -176,7 +179,7 @@ class AlertService
         foreach ($turnos as $t) {
             $fecha = Carbon::parse($t->fecha);
             if (!in_array($fecha->dayOfWeek, [0, 6]) && $t->horas_total > 24) {
-                $count += $this->crearAlerta($archivoId, $medico->id, $uciId, $t->fecha, 'JORNADA_24H_HABIL', 'alta',
+                $count += $this->crearAlerta($archivoId, $medico->id, $t->uci_id, $t->fecha, 'JORNADA_24H_HABIL', 'alta',
                     "El médico {$nombre} tiene más de 24 horas asignadas en día hábil para la fecha {$fecha->format('d/m/Y')}. Validar programación y descanso laboral.");
             }
         }

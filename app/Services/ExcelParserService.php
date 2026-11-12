@@ -29,6 +29,7 @@ class ExcelParserService
         'T'    => ['diurnas' => 6.0,  'nocturnas' => 0.0,  'total' => 6.0,  'ausencia' => false],
         'MT'   => ['diurnas' => 12.0, 'nocturnas' => 0.0,  'total' => 12.0, 'ausencia' => false],
         'N'    => ['diurnas' => 0.0,  'nocturnas' => 12.0, 'total' => 12.0, 'ausencia' => false],
+        'TN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0, 'ausencia' => false],
         'MTN'  => ['diurnas' => 12.0, 'nocturnas' => 12.0, 'total' => 24.0, 'ausencia' => false],
         'MN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0, 'ausencia' => false],
         'VAC'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => true],
@@ -38,8 +39,8 @@ class ExcelParserService
         ''     => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => false],
     ];
 
-    // MN está importado pero genera alerta de "código no oficial"
-    const CODIGOS_NO_OFICIALES = ['MN'];
+    // Códigos válidos pero no parametrizados oficialmente (generan advertencia al importar, no bloquean)
+    const CODIGOS_NO_OFICIALES = [];
 
     const DIA_NOMBRE = [
         0=>'lunes', 1=>'martes', 2=>'miercoles',

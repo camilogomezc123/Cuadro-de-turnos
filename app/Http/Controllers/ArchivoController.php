@@ -136,7 +136,7 @@ class ArchivoController extends Controller
             $msg .= "\n⚠ " . count($resultado['alertas_mtn']) . ' turno(s) MTN en día hábil detectado(s).';
         }
         if (!empty($resultado['alertas_no_oficial'])) {
-            $msg .= "\n⚠ " . count($resultado['alertas_no_oficial']) . ' código(s) no oficial(es) (MN) detectado(s).';
+            $msg .= "\n⚠ " . count($resultado['alertas_no_oficial']) . ' código(s) no oficial(es) detectado(s).';
         }
 
         $tipo = str_contains($msg, '✓') ? 'success' : 'warning';

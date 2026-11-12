@@ -13,6 +13,7 @@ class IndicadorMedico extends Model
         'archivo_id', 'medico_id', 'uci_id', 'mes', 'anio',
         'total_horas', 'horas_diurnas', 'horas_nocturnas',
         'turnos_m', 'turnos_t', 'turnos_mt', 'turnos_n',
+        'turnos_mtn', 'turnos_vac', 'turnos_per', 'turnos_inc',
         'turnos_fin_semana', 'turnos_domingo',
         'promedio_semanal', 'promedio_diario', 'porcentaje_ocupacion',
     ];
