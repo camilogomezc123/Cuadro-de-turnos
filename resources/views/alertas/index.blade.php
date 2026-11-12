@@ -135,11 +135,11 @@
                                         {{ ucfirst($alerta->prioridad) }}
                                     </span>
                                 </td>
-                                <td><span class="small text-muted">{{ $alerta->tipo }}</span></td>
+                                <td><span class="small text-muted">{{ \App\Models\AlertaTurno::TIPOS[$alerta->tipo] ?? $alerta->tipo }}</span></td>
                                 <td style="max-width:300px;white-space:normal;font-size:12px">{{ $alerta->mensaje }}</td>
                                 <td class="small">{{ $alerta->medico?->nombre ?? '—' }}</td>
                                 <td class="small">{{ $alerta->uci?->codigo ?? '—' }}</td>
-                                <td class="small">{{ $alerta->fecha?->format('d/m/Y') ?? '—' }}</td>
+                                <td class="small">{{ $alerta->fecha_turno?->format('d/m/Y') ?? '—' }}</td>
                                 <td>
                                     <span class="badge bg-{{ match($alerta->estado) {
                                         'abierta' => 'danger', 'en_revision' => 'warning', 'cerrada' => 'success', default => 'secondary' } }}-subtle

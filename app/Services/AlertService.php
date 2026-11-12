@@ -234,10 +234,10 @@ class AlertService
         string  $mensaje
     ): int {
         AlertaTurno::create([
-            'archivo_id' => $archivoId,
-            'medico_id'  => $medicoId,
-            'uci_id'     => $uciId,
-            'fecha'      => $fecha ? Carbon::parse($fecha)->toDateString() : null,
+            'archivo_id'  => $archivoId,
+            'medico_id'   => $medicoId,
+            'uci_id'      => $uciId,
+            'fecha_turno' => $fecha ? Carbon::parse($fecha)->toDateString() : null,
             'tipo'       => $tipo,
             'prioridad'  => $prioridad,
             'mensaje'    => $mensaje,
