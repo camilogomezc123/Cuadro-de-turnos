@@ -834,7 +834,9 @@ async function enviarConsentimiento(event, accion) {
 <div class="modal fade" id="modalPerfilMedico" tabindex="-1"
      data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="lblPerfilMedico">
     <div class="modal-dialog modal-dialog-centered" style="max-width:480px">
-        <div class="modal-content border-0 shadow-lg">
+        <form id="formPerfilMedico" class="modal-content border-0 shadow-lg"
+              method="POST" action="{{ route('perfil-medico.completar', [], false) }}">
+            @csrf
 
             <div class="modal-header border-0 pb-2 px-4 pt-4"
                  style="background:linear-gradient(135deg,#1a2340,#2d3f6b);border-radius:.5rem .5rem 0 0">
@@ -850,30 +852,34 @@ async function enviarConsentimiento(event, accion) {
                 <p class="text-muted mb-3" style="font-size:.85rem">
                     Necesitamos tu cédula y especialidad para generar correctamente el cronograma consolidado.
                 </p>
-                <div id="errorPerfilMedico" class="alert alert-danger py-2 small mb-3" style="display:none"></div>
+                @foreach(['documento', 'especialidad'] as $campo)
+                    @error($campo)
+                        <div class="alert alert-danger py-2 small mb-3" role="alert">{{ $message }}</div>
+                    @enderror
+                @endforeach
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold small mb-1">Cédula</label>
-                    <input type="text" id="perfilDocumento" class="form-control" maxlength="30" placeholder="Ej: 94404963">
+                    <input type="text" id="perfilDocumento" name="documento" class="form-control" maxlength="30" value="{{ old('documento', auth()->user()->medico?->documento) }}" required>
                 </div>
                 <div class="mb-2">
                     <label class="form-label fw-semibold small mb-1">Especialidad</label>
-                    <select id="perfilEspecialidad" class="form-select">
+                    <select id="perfilEspecialidad" name="especialidad" class="form-select" required>
                         <option value="">Selecciona tu especialidad…</option>
                         @foreach(\App\Models\Medico::ESPECIALIDADES as $valor => $label)
-                            <option value="{{ $valor }}">{{ $label }}</option>
+                            <option value="{{ $valor }}" @selected(old('especialidad', auth()->user()->medico?->especialidad) === $valor)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
 
             <div class="modal-footer border-0 px-4 pb-4 pt-0">
-                <button type="button" class="btn btn-primary w-100 fw-semibold py-2" onclick="enviarPerfilMedico(event)">
+                <button type="submit" class="btn btn-primary w-100 fw-semibold py-2">
                     <i class="bi bi-check2-circle me-1"></i>Guardar y continuar
                 </button>
             </div>
 
-        </div>
+        </form>
     </div>
 </div>
 <script>
@@ -882,58 +888,6 @@ async function enviarConsentimiento(event, accion) {
         bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPerfilMedico')).show();
     }
 })();
-
-async function enviarPerfilMedico(event) {
-    const btn          = event.currentTarget;
-    const documento    = document.getElementById('perfilDocumento').value.trim();
-    const especialidad = document.getElementById('perfilEspecialidad').value;
-    const errorBox      = document.getElementById('errorPerfilMedico');
-    errorBox.style.display = 'none';
-
-    if (!documento || !especialidad) {
-        errorBox.textContent = 'Completa la cédula y la especialidad para continuar.';
-        errorBox.style.display = '';
-        return;
-    }
-
-    btn.disabled = true;
-    try {
-        const resp = await fetch('{{ route('perfil-medico.completar') }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ documento, especialidad }),
-        });
-
-        // Sesión/token vencidos: recargar para que el servidor pida iniciar sesión de nuevo
-        if (resp.status === 401 || resp.status === 403 || resp.status === 419) {
-            window.location.reload();
-            return;
-        }
-
-        if (!resp.ok) {
-            let mensaje = 'No se pudo guardar. Verifica los datos e intenta de nuevo.';
-            try {
-                const data = await resp.json();
-                const primerError = data?.errors ? Object.values(data.errors)[0]?.[0] : null;
-                mensaje = primerError || data?.message || mensaje;
-            } catch (e) { /* respuesta sin JSON, se usa el mensaje genérico */ }
-            errorBox.textContent = mensaje;
-            errorBox.style.display = '';
-            btn.disabled = false;
-            return;
-        }
-
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalPerfilMedico')).hide();
-    } catch (e) {
-        errorBox.textContent = 'Error de conexión. Verifica tu internet e intenta de nuevo.';
-        errorBox.style.display = '';
-        btn.disabled = false;
-    }
-}
 </script>
 @endif
 @endauth

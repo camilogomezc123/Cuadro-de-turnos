@@ -86,7 +86,9 @@ class AuthController extends Controller
         ]);
         $request->session()->forget('perfil_pendiente');
 
-        return response()->json(['ok' => true]);
+        return $request->expectsJson()
+            ? response()->json(['ok' => true])
+            : redirect()->route('medico.portal');
     }
 
     public function rechazarConsentimiento(Request $request)
