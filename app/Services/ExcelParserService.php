@@ -23,21 +23,8 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
  */
 class ExcelParserService
 {
-    // ── Códigos de turno ──────────────────────────────────────────
-    const TURNOS = [
-        'M'    => ['diurnas' => 6.0,  'nocturnas' => 0.0,  'total' => 6.0,  'ausencia' => false],
-        'T'    => ['diurnas' => 6.0,  'nocturnas' => 0.0,  'total' => 6.0,  'ausencia' => false],
-        'MT'   => ['diurnas' => 12.0, 'nocturnas' => 0.0,  'total' => 12.0, 'ausencia' => false],
-        'N'    => ['diurnas' => 0.0,  'nocturnas' => 12.0, 'total' => 12.0, 'ausencia' => false],
-        'TN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0, 'ausencia' => false],
-        'MTN'  => ['diurnas' => 12.0, 'nocturnas' => 12.0, 'total' => 24.0, 'ausencia' => false],
-        'MN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0, 'ausencia' => false],
-        'VAC'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => true],
-        'PER'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => true],
-        'INC'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => true],
-        'LIBRE'=> ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => false],
-        ''     => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0,  'ausencia' => false],
-    ];
+    // ── Códigos de turno — alias de la fuente única de verdad en App\Support\TurnoHoras ──
+    const TURNOS = \App\Support\TurnoHoras::TABLA;
 
     // Códigos válidos pero no parametrizados oficialmente (generan advertencia al importar, no bloquean)
     const CODIGOS_NO_OFICIALES = [];

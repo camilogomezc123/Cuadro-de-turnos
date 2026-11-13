@@ -12,20 +12,7 @@ use Carbon\Carbon;
 
 class PlantillaService
 {
-    const HORAS = [
-        'M'    => ['diurnas' => 6.0,  'nocturnas' => 0.0,  'total' => 6.0],
-        'T'    => ['diurnas' => 6.0,  'nocturnas' => 0.0,  'total' => 6.0],
-        'MT'   => ['diurnas' => 12.0, 'nocturnas' => 0.0,  'total' => 12.0],
-        'N'    => ['diurnas' => 0.0,  'nocturnas' => 12.0, 'total' => 12.0],
-        'TN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0],
-        'MTN'  => ['diurnas' => 12.0, 'nocturnas' => 12.0, 'total' => 24.0],
-        'MN'   => ['diurnas' => 6.0,  'nocturnas' => 12.0, 'total' => 18.0],
-        'VAC'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0],
-        'PER'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0],
-        'INC'  => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0],
-        'LIBRE'=> ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0],
-        ''     => ['diurnas' => 0.0,  'nocturnas' => 0.0,  'total' => 0.0],
-    ];
+    const HORAS = \App\Support\TurnoHoras::TABLA;
 
     private TurnoCalculatorService $calculator;
 

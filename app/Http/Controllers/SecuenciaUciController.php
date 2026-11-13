@@ -423,9 +423,6 @@ class SecuenciaUciController extends Controller
                 ->where('uci_id', $uci->id)
                 ->delete();
 
-            $horasMap = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'TN'=>18,'MTN'=>24,'MN'=>18,
-                         'VAC'=>0,'PER'=>0,'INC'=>0,'LIBRE'=>0,''=>0];
-
             foreach ($parsed['doctores'] as $doc) {
                 // Buscar o crear médico — case-insensitive, tolera nombre completo en columna 'nombre'
                 $partes   = explode(' ', $doc['nombre'], 2);
@@ -445,7 +442,7 @@ class SecuenciaUciController extends Controller
                     $fecha   = Carbon::create($anio, $mes, $dia);
                     $dow     = $fecha->dayOfWeek;       // 0=Dom..6=Sáb
                     $idx     = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
-                    $horas   = $horasMap[$codigo] ?? 0;
+                    $horas   = \App\Support\TurnoHoras::total($codigo);
                     $esFinde = in_array($dow, [0, 6]);
                     $diaNom  = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'][$idx];
 

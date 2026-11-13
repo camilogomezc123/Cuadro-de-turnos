@@ -10,15 +10,13 @@ use App\Models\IndicadorMedico;
 use App\Models\IndicadorUci;
 use App\Services\TurnoCalculatorService;
 use App\Services\AlertService;
+use App\Support\TurnoHoras;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class TurnoEditorController extends Controller
 {
-    const CODIGOS   = ['M','T','MT','N','TN','MTN','MN','VAC','PER','INC',''];
-    const HORAS_MAP = ['M'=>6,'T'=>6,'MT'=>12,'N'=>12,'TN'=>18,'MTN'=>24,'MN'=>18,'VAC'=>0,'PER'=>0,'INC'=>0,''=>0];
-    const CODIGOS_NOCTURNOS = ['N','TN','MTN','MN'];
     const DIAS_SEMANA = ['L','M','M','J','V','S','D']; // Lun=0 … Dom=6
 
     public function __construct(
@@ -128,9 +126,9 @@ class TurnoEditorController extends Controller
                     $dow     = $fecha->dayOfWeek; // 0=Dom, 1=Lun … 6=Sab
                     $idx     = ($dow === 0) ? 6 : $dow - 1; // 0=Lun…6=Dom
                     $codigo  = strtoupper(trim($patron[$idx] ?? ''));
-                    if (!isset(self::HORAS_MAP[$codigo])) $codigo = '';
+                    if (!isset(TurnoHoras::TABLA[$codigo])) $codigo = '';
 
-                    $horas   = self::HORAS_MAP[$codigo] ?? 0;
+                    $horas   = TurnoHoras::total($codigo);
                     $esFinde = in_array($dow, [0, 6]);
 
                     $filas[] = [
@@ -141,8 +139,8 @@ class TurnoEditorController extends Controller
                         'dia_numero'      => $d,
                         'dia_semana'      => $this->nombreDiaSemana($idx),
                         'codigo_turno'    => $codigo,
-                        'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                        'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                        'horas_diurnas'   => max($horas - (TurnoHoras::esNocturno($codigo) ? 12 : 0), 0),
+                        'horas_nocturnas' => TurnoHoras::esNocturno($codigo) ? 12 : 0,
                         'horas_total'     => $horas,
                         'es_fin_semana'   => $esFinde,
                         'es_domingo'      => ($dow === 0),
@@ -252,7 +250,7 @@ class TurnoEditorController extends Controller
                             $dow    = $fecha->dayOfWeek;
                             $idx    = ($dow === 0) ? 6 : $dow - 1;
                             $codigo = strtoupper($diasPattern[$idx] ?? '');
-                            $horas  = self::HORAS_MAP[$codigo] ?? 0;
+                            $horas  = TurnoHoras::total($codigo);
 
                             $filas[] = [
                                 'archivo_id'      => $archivoDestino->id,
@@ -262,8 +260,8 @@ class TurnoEditorController extends Controller
                                 'dia_numero'      => $d,
                                 'dia_semana'      => $this->nombreDiaSemana($idx),
                                 'codigo_turno'    => $codigo,
-                                'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                                'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                                'horas_diurnas'   => max($horas - (TurnoHoras::esNocturno($codigo) ? 12 : 0), 0),
+                                'horas_nocturnas' => TurnoHoras::esNocturno($codigo) ? 12 : 0,
                                 'horas_total'     => $horas,
                                 'es_fin_semana'   => in_array($dow, [0,6]),
                                 'es_domingo'      => ($dow === 0),
@@ -362,7 +360,7 @@ class TurnoEditorController extends Controller
                 $dow    = $fecha->dayOfWeek;
                 $idx    = ($dow === 0) ? 6 : $dow - 1;
                 $codigo = strtoupper(trim($patron[$idx] ?? ''));
-                $horas  = self::HORAS_MAP[$codigo] ?? 0;
+                $horas  = TurnoHoras::total($codigo);
 
                 $filas[] = [
                     'archivo_id'     => $archivo->id,
@@ -372,8 +370,8 @@ class TurnoEditorController extends Controller
                     'dia_numero'     => $d,
                     'dia_semana'     => $this->nombreDiaSemana($idx),
                     'codigo_turno'   => $codigo,
-                    'horas_diurnas'  => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                    'horas_nocturnas'=> in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                    'horas_diurnas'  => max($horas - (TurnoHoras::esNocturno($codigo) ? 12 : 0), 0),
+                    'horas_nocturnas'=> TurnoHoras::esNocturno($codigo) ? 12 : 0,
                     'horas_total'    => $horas,
                     'es_fin_semana'  => in_array($dow,[0,6]),
                     'es_domingo'     => ($dow===0),
@@ -430,8 +428,8 @@ class TurnoEditorController extends Controller
             ]);
 
             $codigo = strtoupper(trim($request->codigo_nuevo ?? ''));
-            if (!array_key_exists($codigo, self::HORAS_MAP)) $codigo = '';
-            $horas  = self::HORAS_MAP[$codigo] ?? 0;
+            if (!array_key_exists($codigo, TurnoHoras::TABLA)) $codigo = '';
+            $horas  = TurnoHoras::total($codigo);
             $fecha  = \Carbon\Carbon::parse($request->fecha);
             $dow    = $fecha->dayOfWeek;
             $idx    = ($dow === 0) ? 6 : $dow - 1;
@@ -445,8 +443,8 @@ class TurnoEditorController extends Controller
             if ($turno) {
                 $turno->update([
                     'codigo_turno'    => $codigo,
-                    'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                    'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                    'horas_diurnas'   => max($horas - (TurnoHoras::esNocturno($codigo) ? 12 : 0), 0),
+                    'horas_nocturnas' => TurnoHoras::esNocturno($codigo) ? 12 : 0,
                     'horas_total'     => $horas,
                     'es_fin_semana'   => in_array($dow,[0,6]),
                     'es_domingo'      => ($dow===0),
@@ -468,8 +466,8 @@ class TurnoEditorController extends Controller
                     'dia_numero'      => $fecha->day,
                     'dia_semana'      => $this->nombreDiaSemana($idx),
                     'codigo_turno'    => $codigo,
-                    'horas_diurnas'   => max($horas - (in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                    'horas_nocturnas' => in_array($codigo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                    'horas_diurnas'   => max($horas - (TurnoHoras::esNocturno($codigo) ? 12 : 0), 0),
+                    'horas_nocturnas' => TurnoHoras::esNocturno($codigo) ? 12 : 0,
                     'horas_total'     => $horas,
                     'es_fin_semana'   => in_array($dow,[0,6]),
                     'es_domingo'      => ($dow===0),
@@ -506,7 +504,7 @@ class TurnoEditorController extends Controller
         }
 
         $codigoNuevo = strtoupper(trim($request->codigo_nuevo ?: $turno->codigo_turno));
-        $horas       = self::HORAS_MAP[$codigoNuevo] ?? 0;
+        $horas       = TurnoHoras::total($codigoNuevo);
 
         DB::transaction(function () use ($turno, $medicoNuevoId, $codigoNuevo, $horas) {
             if ($medicoNuevoId) {
@@ -515,8 +513,8 @@ class TurnoEditorController extends Controller
                     [
                         'dia_numero'=>$turno->dia_numero,'dia_semana'=>$turno->dia_semana,
                         'codigo_turno'=>$codigoNuevo,
-                        'horas_diurnas'=>max($horas - (in_array($codigoNuevo, self::CODIGOS_NOCTURNOS) ? 12 : 0), 0),
-                        'horas_nocturnas'=>in_array($codigoNuevo, self::CODIGOS_NOCTURNOS) ? 12 : 0,
+                        'horas_diurnas'=>max($horas - (TurnoHoras::esNocturno($codigoNuevo) ? 12 : 0), 0),
+                        'horas_nocturnas'=>TurnoHoras::esNocturno($codigoNuevo) ? 12 : 0,
                         'horas_total'=>$horas,
                         'es_fin_semana'=>$turno->es_fin_semana,'es_domingo'=>$turno->es_domingo,
                     ]
@@ -556,14 +554,14 @@ class TurnoEditorController extends Controller
             $to->update([
                 'medico_id'       => $medicoDest,
                 'codigo_turno'    => $codDest,
-                'horas_total'     => self::HORAS_MAP[$codDest] ?? 0,
+                'horas_total'     => TurnoHoras::total($codDest),
             ]);
 
             // El turno destino pasa al médico origen con el código origen
             $td->update([
                 'medico_id'       => $medicoOrig,
                 'codigo_turno'    => $codOrigen,
-                'horas_total'     => self::HORAS_MAP[$codOrigen] ?? 0,
+                'horas_total'     => TurnoHoras::total($codOrigen),
             ]);
         });
 
