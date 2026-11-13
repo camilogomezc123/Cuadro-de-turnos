@@ -193,6 +193,13 @@
             </button>
         </div>
         <div class="panel-body">
+            @if(!$mesActivo)
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="bi bi-hourglass-split me-1"></i>
+                    El cuadro de {{ $meses[$mes-1] }} {{ $anio }} todavía no ha sido activado por el coordinador —
+                    cuando se active vas a poder verlo y gestionar cambios de turno sobre él.
+                </div>
+            @endif
             <div class="row g-1 mb-2 text-center">
                 @foreach(['Lu','Ma','Mi','Ju','Vi','Sá','Do'] as $d)
                     <div class="col"><small class="fw-bold text-muted">{{ $d }}</small></div>

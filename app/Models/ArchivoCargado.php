@@ -11,12 +11,13 @@ class ArchivoCargado extends Model
 
     protected $fillable = [
         'nombre_archivo', 'ruta', 'mes', 'anio',
-        'procesado', 'total_medicos', 'total_turnos',
+        'procesado', 'activo', 'total_medicos', 'total_turnos',
         'errores', 'advertencias',
     ];
 
     protected $casts = [
         'procesado' => 'boolean',
+        'activo'    => 'boolean',
         'errores'   => 'array',
         'advertencias' => 'array',
     ];

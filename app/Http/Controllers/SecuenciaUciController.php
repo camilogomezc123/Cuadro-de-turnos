@@ -60,6 +60,7 @@ class SecuenciaUciController extends Controller
                 'nombre'              => $request->nombre,
                 'anio'                => $request->anio,
                 'activa'              => true,
+                'semana_ancla'        => $this->semanaAnclaParaAnio((int) $request->anio),
                 'creada_por_usuario_id'=> Auth::id(),
             ]);
 
@@ -233,6 +234,42 @@ class SecuenciaUciController extends Controller
         return back()->with('success', 'Secuencia desactivada.');
     }
 
+    // ── Activar / desactivar un mes ya generado para los médicos ─
+
+    public function activarMes(ArchivoCargado $archivo)
+    {
+        $archivo->update(['activo' => true]);
+
+        AuditoriaSistema::registrar(
+            'ACTIVAR_MES', 'archivos', 'ArchivoCargado', $archivo->id,
+            null, ['mes' => $archivo->mes, 'anio' => $archivo->anio],
+            "Mes activado para médicos", Auth::user()->name
+        );
+
+        return back()->with('success', "{$archivo->nombre_mes} {$archivo->anio} activado: ya es visible para los médicos y pueden solicitar cambios de turno.");
+    }
+
+    public function desactivarMes(ArchivoCargado $archivo)
+    {
+        $archivo->update(['activo' => false]);
+
+        AuditoriaSistema::registrar(
+            'DESACTIVAR_MES', 'archivos', 'ArchivoCargado', $archivo->id,
+            null, ['mes' => $archivo->mes, 'anio' => $archivo->anio],
+            "Mes desactivado para médicos", Auth::user()->name
+        );
+
+        return back()->with('success', "{$archivo->nombre_mes} {$archivo->anio} desactivado: los médicos ya no lo ven ni pueden gestionar cambios sobre él.");
+    }
+
+    // Lunes de referencia para un año: el lunes de la semana que contiene el 1 de
+    // enero de ese año. Fijo e independiente del orden en que luego se activen
+    // los meses, para que la rotación de fin de semana no se rompa entre ellos.
+    private function semanaAnclaParaAnio(int $anio): Carbon
+    {
+        return Carbon::create($anio, 1, 1)->startOfWeek(Carbon::MONDAY);
+    }
+
     // ── Carga de Excel por UCI ───────────────────────────────────
 
     public function cargarExcelForm(Request $request)
@@ -245,7 +282,13 @@ class SecuenciaUciController extends Controller
         // Si viene de un parse exitoso, mostrar preview
         $preview = session('secuencia_preview');
 
-        return view('secuencias.cargar-excel', compact('ucis','meses','anios','preview'));
+        // Meses del año de la secuencia que ya tienen turnos generados, con su
+        // estado activo/inactivo, para poder activarlos o desactivarlos aquí mismo.
+        $archivosDelAnio = $preview
+            ? ArchivoCargado::where('anio', $preview['anio'])->orderBy('mes')->get()
+            : collect();
+
+        return view('secuencias.cargar-excel', compact('ucis','meses','anios','preview','archivosDelAnio'));
     }
 
     public function parsearExcel(Request $request)
@@ -276,6 +319,7 @@ class SecuenciaUciController extends Controller
                 'nombre'               => $request->nombre,
                 'anio'                 => $request->anio,
                 'activa'               => true,
+                'semana_ancla'         => $this->semanaAnclaParaAnio((int) $request->anio),
                 'creada_por_usuario_id'=> Auth::id(),
             ]);
 
@@ -711,15 +755,22 @@ class SecuenciaUciController extends Controller
         $uciId       = $secuencia->uci_id;
         $turnosCreados = 0;
 
-        // Buscar o crear archivo del mes
+        // Buscar o crear archivo del mes — queda inactivo (oculto para médicos) hasta
+        // que el master lo active explícitamente con activarMes().
         $archivo = ArchivoCargado::firstOrCreate(
             ['mes' => $mes, 'anio' => $anio],
             [
                 'nombre_archivo' => "Secuencia {$secuencia->uci->codigo} — {$mes}/{$anio}",
-                'ruta'           => '', 'procesado' => true,
+                'ruta'           => '', 'procesado' => true, 'activo' => false,
                 'total_medicos'  => 0, 'total_turnos' => 0,
             ]
         );
+
+        // Ancla de semana: punto de referencia fijo para que la rotación de fin de
+        // semana no se reinicie cada vez que se aplica un mes por separado. Las
+        // secuencias creadas antes de este cambio no tienen ancla — se usa el 1 de
+        // enero del año de la secuencia como respaldo.
+        $semanaAncla = $secuencia->semana_ancla ?? $this->semanaAnclaParaAnio((int) $secuencia->anio);
 
         // Obtener detalles de la secuencia (solo vigentes)
         $detalles = $secuencia->detalles()
@@ -768,20 +819,23 @@ class SecuenciaUciController extends Controller
         }
 
         DB::transaction(function () use (
-            $archivo, $uciId, $mes, $anio, $diasEnMes, $patron4, $finSemanaMap, $usa4Semanas, &$turnosCreados
+            $archivo, $uciId, $mes, $anio, $diasEnMes, $patron4, $finSemanaMap, $usa4Semanas, $semanaAncla, &$turnosCreados
         ) {
             // Borrar turnos previos de esta UCI en este archivo
             TurnoMedico::where('archivo_id', $archivo->id)->where('uci_id', $uciId)->delete();
 
             $filas = [];
-            $semanaNum = 0;
+            $anclaLunes = $semanaAncla->copy()->startOfWeek(Carbon::MONDAY);
 
             for ($d = 1; $d <= $diasEnMes; $d++) {
                 $fecha = Carbon::create($anio, $mes, $d);
                 $dow   = $fecha->dayOfWeek; // 0=Dom, 1=Lun ... 6=Sab
                 $idx   = ($dow === 0) ? 6 : $dow - 1; // 0=Lun..6=Dom
 
-                if ($idx === 0) $semanaNum++; // lunes nuevo → nueva semana
+                // Semana absoluta desde el ancla — continua sin importar el orden o
+                // combinación de meses/años que se activen (no se reinicia por mes).
+                $lunesDeEstaSemana = $fecha->copy()->startOfWeek(Carbon::MONDAY);
+                $semanaNum         = (int) floor($anclaLunes->diffInDays($lunesDeEstaSemana) / 7) + 1;
 
                 // Semana del patrón: cicla 1→2→3→4→1→2→...
                 $semanaPatron = (($semanaNum - 1) % 4) + 1;

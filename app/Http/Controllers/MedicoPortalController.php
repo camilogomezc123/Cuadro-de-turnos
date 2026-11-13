@@ -43,10 +43,16 @@ class MedicoPortalController extends Controller
         $meses= ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-        // Mis turnos del mes (multi-UCI)
-        $misTurnos = TurnoMedico::where('medico_id', $medico->id)
-            ->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
-            ->with('uci')->orderBy('fecha')->get();
+        // Mis turnos del mes (multi-UCI) — solo si el mes está activado para médicos.
+        // Un mes generado por secuencia-molde queda oculto hasta que el master lo active.
+        $mesActivo = ArchivoCargado::where('mes', $mes)->where('anio', $anio)
+            ->where('activo', true)->exists();
+
+        $misTurnos = $mesActivo
+            ? TurnoMedico::where('medico_id', $medico->id)
+                ->whereYear('fecha', $anio)->whereMonth('fecha', $mes)
+                ->with('uci')->orderBy('fecha')->get()
+            : collect();
 
         // Resumen multi-UCI
         $resumen = $this->horaService->resumenMedico($medico->id, $mes, $anio);
@@ -109,8 +115,8 @@ class MedicoPortalController extends Controller
         $todosMedicos = Medico::where('activo', true)
             ->where('id', '!=', $medico->id)->orderBy('nombre')->get();
 
-        // Meses disponibles
-        $mesesDisponibles = ArchivoCargado::where('procesado', true)
+        // Meses disponibles (solo activos)
+        $mesesDisponibles = ArchivoCargado::where('procesado', true)->where('activo', true)
             ->orderByDesc('anio')->orderByDesc('mes')->get(['mes','anio']);
 
         // Calendario del mes
@@ -129,7 +135,7 @@ class MedicoPortalController extends Controller
         }
 
         return view('medico.portal', compact(
-            'medico', 'misTurnos', 'resumen', 'mes', 'anio', 'meses',
+            'medico', 'misTurnos', 'resumen', 'mes', 'anio', 'meses', 'mesActivo',
             'supera200', 'alertas200', 'alertas12h',
             'solicitudesEnviadas', 'solicitudesRecibidas', 'pendientesRecibidas',
             'turnosDisponibles', 'misNovedades',

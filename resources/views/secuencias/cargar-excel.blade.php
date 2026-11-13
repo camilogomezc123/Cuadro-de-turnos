@@ -306,6 +306,38 @@
                     <i class="bi bi-calendar-plus me-2"></i>Generar turnos para los meses seleccionados
                 </button>
             </form>
+
+            @if($archivosDelAnio->isNotEmpty())
+            <hr class="my-4">
+            <p class="fw-bold mb-2">Meses de {{ $preview['anio'] }} generados — activar/desactivar para médicos:</p>
+            <div class="list-group">
+                @foreach($archivosDelAnio as $arch)
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{{ $arch->nombre_mes }} {{ $arch->anio }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                        @if($arch->activo)
+                            <span class="badge bg-success-subtle text-success">Activo — visible a médicos</span>
+                            <form method="POST" action="{{ route('secuencias.archivo.desactivar', $arch) }}">
+                                @csrf @method('PATCH')
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-eye-slash me-1"></i>Desactivar
+                                </button>
+                            </form>
+                        @else
+                            <span class="badge bg-secondary-subtle text-secondary">Oculto para médicos</span>
+                            <form method="POST" action="{{ route('secuencias.archivo.activar', $arch) }}">
+                                @csrf @method('PATCH')
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="bi bi-eye me-1"></i>Activar
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
             @else
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-arrow-left-circle fs-1 d-block mb-3 text-primary"></i>

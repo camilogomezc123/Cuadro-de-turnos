@@ -25,7 +25,10 @@ class CambioTurnoController extends Controller
         $estado    = $request->string('estado', '');
         $esMaestro = $user->esMaster();
 
-        $archivos  = ArchivoCargado::orderByDesc('anio')->orderByDesc('mes')->get();
+        // Los médicos (no-master) solo ven meses activados para ellos; el master ve todos
+        // para poder gestionar/activar los que falten.
+        $archivos  = ArchivoCargado::when(!$esMaestro, fn($q) => $q->where('activo', true))
+            ->orderByDesc('anio')->orderByDesc('mes')->get();
         $archivoId = (int)($request->archivo_id ?? $archivos->first()?->id ?? 0);
         $archivo   = $archivos->firstWhere('id', $archivoId);
 

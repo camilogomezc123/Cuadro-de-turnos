@@ -11,10 +11,10 @@ class SecuenciaUci extends Model
     protected $table = 'secuencias_uci';
 
     protected $fillable = [
-        'uci_id', 'nombre', 'anio', 'activa', 'creada_por_usuario_id',
+        'uci_id', 'nombre', 'anio', 'activa', 'semana_ancla', 'creada_por_usuario_id',
     ];
 
-    protected $casts = ['activa' => 'boolean'];
+    protected $casts = ['activa' => 'boolean', 'semana_ancla' => 'date'];
 
     public function uci(): BelongsTo
     {
