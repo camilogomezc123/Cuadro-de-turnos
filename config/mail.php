@@ -115,4 +115,12 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Destinatario del consolidado mensual automático
+    |--------------------------------------------------------------------------
+    */
+
+    'consolidado_destinatario' => env('CONSOLIDADO_DESTINATARIO'),
+
 ];

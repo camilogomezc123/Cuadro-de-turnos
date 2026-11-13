@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Envía el recordatorio de turno 12h antes de que inicie (revisa cada 15 min).
 Schedule::command('turnos:recordatorios')->everyFifteenMinutes();
+
+// Envía y archiva el consolidado mensual el último día de cada mes a las 22:30.
+Schedule::command('turnos:enviar-mensual')->lastDayOfMonth('22:30');

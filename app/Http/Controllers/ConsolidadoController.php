@@ -113,12 +113,7 @@ class ConsolidadoController extends Controller
         $mes  = (int)($request->mes  ?? now()->month);
         $anio = (int)($request->anio ?? now()->year);
 
-        $spreadsheet = new Spreadsheet();
-        $this->hojaConsolidadoMedicos($spreadsheet, $mes, $anio);
-        $this->hojaCronogramaCompleto($spreadsheet, $mes, $anio);
-        $this->hojaConsolidadoUcis($spreadsheet, $mes, $anio);
-        $this->hojaAlertas($spreadsheet, $mes, $anio);
-        $this->hojaNovedades($spreadsheet, $mes, $anio);
+        $tmp = $this->generarArchivoConsolidado($mes, $anio);
 
         AuditoriaSistema::registrar(
             'DESCARGAR_CONSOLIDADO', 'reportes', null, null,
@@ -126,7 +121,29 @@ class ConsolidadoController extends Controller
             "Descarga consolidado {$mes}/{$anio}", Auth::user()->name
         );
 
-        return $this->enviarExcel($spreadsheet, "Consolidado_UCI_{$mes}_{$anio}.xlsx");
+        return response()->download($tmp, "Consolidado_UCI_{$mes}_{$anio}.xlsx", [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Genera el Excel de consolidado mensual (mismas hojas que la descarga manual)
+     * y lo deja en un archivo temporal. Usado también por el envío automático por correo.
+     */
+    public function generarArchivoConsolidado(int $mes, int $anio): string
+    {
+        $spreadsheet = new Spreadsheet();
+        $this->hojaConsolidadoMedicos($spreadsheet, $mes, $anio);
+        $this->hojaCronogramaCompleto($spreadsheet, $mes, $anio);
+        $this->hojaConsolidadoUcis($spreadsheet, $mes, $anio);
+        $this->hojaAlertas($spreadsheet, $mes, $anio);
+        $this->hojaNovedades($spreadsheet, $mes, $anio);
+
+        $writer = new Xlsx($spreadsheet);
+        $tmp    = tempnam(sys_get_temp_dir(), 'uci_') . '.xlsx';
+        $writer->save($tmp);
+
+        return $tmp;
     }
 
     // ── Excel: Cuadro de turnos completo ────────────────────────
