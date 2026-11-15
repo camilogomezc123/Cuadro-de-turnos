@@ -307,9 +307,43 @@
                 </button>
             </form>
 
-            @if($archivosDelAnio->isNotEmpty())
-            <hr class="my-4">
-            <p class="fw-bold mb-2">Meses de {{ $preview['anio'] }} generados — activar/desactivar para médicos:</p>
+            @else
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-arrow-left-circle fs-1 d-block mb-3 text-primary"></i>
+                <p>Sube el Excel con la secuencia (formulario de la izquierda).<br>
+                Aquí aparecerán los meses disponibles para aplicar.</p>
+                <hr class="my-4">
+                <p class="small"><strong>¿Ya tienes secuencias guardadas?</strong></p>
+                <a href="{{ route('secuencias.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-list me-1"></i>Ver secuencias existentes
+                </a>
+            </div>
+            @endif
+        </div>
+    </div>
+</div>
+
+{{-- Activar/desactivar meses ya generados — independiente de haber subido un Excel en esta sesión --}}
+<div class="col-12">
+    <div class="panel">
+        <div class="panel-header">
+            <span class="panel-title"><i class="bi bi-eye me-2 text-success"></i>Activar / desactivar meses generados</span>
+        </div>
+        <div class="panel-body">
+            <form method="GET" action="{{ route('secuencias.cargar-excel') }}" class="d-flex align-items-end gap-2 mb-3 flex-wrap">
+                <div>
+                    <label class="form-label fw-bold small mb-1">Año a consultar</label>
+                    <select name="ver_anio" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">Seleccione el año...</option>
+                        @foreach($anios as $y)
+                            <option value="{{ $y }}" @selected($anioConsulta == $y)>{{ $y }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">Ver</button></noscript>
+            </form>
+
+            @if($anioConsulta && $archivosDelAnio->isNotEmpty())
             <div class="list-group">
                 @foreach($archivosDelAnio as $arch)
                 <div class="list-group-item d-flex justify-content-between align-items-center">
@@ -336,19 +370,10 @@
                 </div>
                 @endforeach
             </div>
-            @endif
-
+            @elseif($anioConsulta)
+            <p class="text-muted small mb-0">No hay meses generados todavía para {{ $anioConsulta }}.</p>
             @else
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-arrow-left-circle fs-1 d-block mb-3 text-primary"></i>
-                <p>Sube el Excel con la secuencia (formulario de la izquierda).<br>
-                Aquí aparecerán los meses disponibles para aplicar.</p>
-                <hr class="my-4">
-                <p class="small"><strong>¿Ya tienes secuencias guardadas?</strong></p>
-                <a href="{{ route('secuencias.index') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-list me-1"></i>Ver secuencias existentes
-                </a>
-            </div>
+            <p class="text-muted small mb-0">Selecciona un año para ver qué meses ya están generados y activarlos o desactivarlos para los médicos.</p>
             @endif
         </div>
     </div>

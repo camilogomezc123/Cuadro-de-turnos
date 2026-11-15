@@ -282,13 +282,21 @@ class SecuenciaUciController extends Controller
         // Si viene de un parse exitoso, mostrar preview
         $preview = session('secuencia_preview');
 
-        // Meses del año de la secuencia que ya tienen turnos generados, con su
-        // estado activo/inactivo, para poder activarlos o desactivarlos aquí mismo.
-        $archivosDelAnio = $preview
-            ? ArchivoCargado::where('anio', $preview['anio'])->orderBy('mes')->get()
+        // Año a consultar para ver/activar/desactivar meses ya generados:
+        // el que se seleccione explícitamente, o si no, el del preview reciente.
+        $anioConsulta = $request->integer('ver_anio') ?: ($preview['anio'] ?? null);
+
+        if ($request->has('ver_anio')) {
+            session(['tab_activo' => 'secuencia']);
+        }
+
+        // Meses de ese año que ya tienen turnos generados, con su estado
+        // activo/inactivo, para poder activarlos o desactivarlos aquí mismo.
+        $archivosDelAnio = $anioConsulta
+            ? ArchivoCargado::where('anio', $anioConsulta)->orderBy('mes')->get()
             : collect();
 
-        return view('secuencias.cargar-excel', compact('ucis','meses','anios','preview','archivosDelAnio'));
+        return view('secuencias.cargar-excel', compact('ucis','meses','anios','preview','archivosDelAnio','anioConsulta'));
     }
 
     public function parsearExcel(Request $request)
