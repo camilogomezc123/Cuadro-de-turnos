@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\TurnoMedico;
 use App\Notifications\RecordatorioTurno;
-use App\Services\WhatsappService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -44,20 +43,11 @@ class EnviarRecordatoriosTurno extends Command
 
             $medico = $turno->medico;
 
-            if (!$medico || (!$medico->email && !$medico->telefono)) {
+            if (!$medico || !$medico->email) {
                 continue;
             }
 
-            if ($medico->email) {
-                $medico->notify(new RecordatorioTurno($turno));
-            }
-
-            WhatsappService::enviar(
-                $medico->telefono,
-                "Hola {$medico->nombre}, recuerda que tienes turno {$turno->codigo_turno} en {$turno->uci?->nombre} "
-                . "el " . $inicio->translatedFormat('d \d\e F') . " a las " . $inicio->format('H:i') . "."
-            );
-
+            $medico->notify(new RecordatorioTurno($turno));
             $turno->update(['recordatorio_enviado_at' => $ahora]);
             $enviados++;
         }
