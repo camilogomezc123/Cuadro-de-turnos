@@ -59,7 +59,7 @@ Route::middleware('auth')->prefix('burnout')->name('burnout.')->group(function (
 // ── Rutas protegidas ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
 
-    Route::redirect('/', '/dashboard');
+    Route::get('/', fn () => redirect()->route('dashboard.index'));
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
@@ -107,7 +107,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/turnos/editor/agregar-medico',        [TurnoEditorController::class, 'agregarMedico'])   ->name('turno-editor.agregar-medico');
         Route::post('/turnos/editor/sustituir',             [TurnoEditorController::class, 'sustituir'])       ->name('turno-editor.sustituir');
         Route::patch('/turnos/editor/medico/{medico}',      [TurnoEditorController::class, 'actualizarMedico'])->name('turno-editor.actualizar-medico');
-        Route::post('/turnos/editor/aprobar-cambio/{sol}',  [TurnoEditorController::class, 'aprobarCambio'])   ->name('turno-editor.aprobar-cambio');
 
         // Secuencias UCI
         Route::get('/secuencias',                              [SecuenciaUciController::class, 'index'])          ->name('secuencias.index');

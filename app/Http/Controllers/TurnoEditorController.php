@@ -531,43 +531,6 @@ class TurnoEditorController extends Controller
 
     // ── Aprobar cambio de turno (coordinador/master) ─────────────
 
-    public function aprobarCambio(Request $request, \App\Models\SolicitudCambioTurno $solicitud)
-    {
-        $solicitud->update([
-            'estado'           => 'aprobado_coordinador',
-            'aprobado_por'     => auth()->user()->name,
-            'resuelto_at'      => now(),
-            'motivo_coordinador'=> $request->motivo,
-        ]);
-
-        // Intercambiar los códigos de turno
-        $to = $solicitud->turnoOrigen;
-        $td = $solicitud->turnoDestino;
-
-        DB::transaction(function () use ($to, $td) {
-            $codOrigen  = $to->codigo_turno;
-            $medicoOrig = $to->medico_id;
-            $codDest    = $td->codigo_turno;
-            $medicoDest = $td->medico_id;
-
-            // El turno origen pasa al médico destino con el código destino
-            $to->update([
-                'medico_id'       => $medicoDest,
-                'codigo_turno'    => $codDest,
-                'horas_total'     => TurnoHoras::total($codDest),
-            ]);
-
-            // El turno destino pasa al médico origen con el código origen
-            $td->update([
-                'medico_id'       => $medicoOrig,
-                'codigo_turno'    => $codOrigen,
-                'horas_total'     => TurnoHoras::total($codOrigen),
-            ]);
-        });
-
-        return back()->with('success', 'Cambio de turno aprobado y aplicado.');
-    }
-
     // ── Helpers ──────────────────────────────────────────────────
 
     private function generarDiasInfo(int $mes, int $anio): array
