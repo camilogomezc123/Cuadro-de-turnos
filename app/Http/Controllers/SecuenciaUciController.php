@@ -9,6 +9,7 @@ use App\Models\Medico;
 use App\Models\TurnoMedico;
 use App\Models\ArchivoCargado;
 use App\Models\AuditoriaSistema;
+use App\Services\AlertService;
 use App\Services\HoraConsolidadoService;
 use App\Services\TurnoService;
 use Carbon\Carbon;
@@ -21,6 +22,8 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 class SecuenciaUciController extends Controller
 {
     const CODIGOS_VALIDOS = ['M','T','MT','N','TN','MTN','MN','PER','INC','LIBRE',''];
+
+    public function __construct(private AlertService $alertService) {}
 
     public function index(Request $request)
     {
@@ -946,6 +949,10 @@ class SecuenciaUciController extends Controller
                 'total_turnos'  => ($archivo->total_turnos ?? 0) + $turnosCreados,
             ]);
         });
+
+        // Generar alertas (igual que al importar un Excel) para que turnos sin
+        // descanso, sin cobertura, etc. queden visibles en el panel de Alertas.
+        $this->alertService->validarArchivo($archivo->id);
 
         return ['turnos_creados' => $turnosCreados];
     }
