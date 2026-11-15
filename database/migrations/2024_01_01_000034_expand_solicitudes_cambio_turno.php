@@ -6,25 +6,34 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration {
+    const ESTADOS = [
+        'solicitado',
+        'pendiente',
+        'enviado_a_receptor',
+        'aceptado_por_receptor',
+        'rechazado_por_receptor',
+        'pendiente_aprobacion_maestro',
+        'aprobado_por_maestro',
+        'rechazado_por_maestro',
+        'aceptado_colega',
+        'rechazado_colega',
+        'aprobado_coordinador',
+        'rechazado_coordinador',
+        'cancelado',
+    ];
+
     public function up(): void
     {
-        // Ampliar ENUM de estado y agregar tipo_movimiento
-        DB::statement("ALTER TABLE solicitudes_cambio_turno
-            MODIFY estado ENUM(
-                'solicitado',
-                'pendiente',
-                'enviado_a_receptor',
-                'aceptado_por_receptor',
-                'rechazado_por_receptor',
-                'pendiente_aprobacion_maestro',
-                'aprobado_por_maestro',
-                'rechazado_por_maestro',
-                'aceptado_colega',
-                'rechazado_colega',
-                'aprobado_coordinador',
-                'rechazado_coordinador',
-                'cancelado'
-            ) DEFAULT 'pendiente'");
+        // Ampliar ENUM de estado y agregar tipo_movimiento. SQLite (usado en
+        // tests) no soporta ALTER TABLE ... MODIFY; ahí se recrea la columna.
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('solicitudes_cambio_turno', function (Blueprint $table) {
+                $table->enum('estado', self::ESTADOS)->default('pendiente')->change();
+            });
+        } else {
+            DB::statement("ALTER TABLE solicitudes_cambio_turno
+                MODIFY estado ENUM('" . implode("','", self::ESTADOS) . "') DEFAULT 'pendiente'");
+        }
 
         Schema::table('solicitudes_cambio_turno', function (Blueprint $table) {
             $table->enum('tipo_movimiento', [

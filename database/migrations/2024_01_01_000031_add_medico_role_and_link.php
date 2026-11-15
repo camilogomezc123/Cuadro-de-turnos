@@ -9,8 +9,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Cambiar el enum para incluir 'medico'
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('master','coordinador','visualizador','medico') DEFAULT 'visualizador'");
+        // Cambiar el enum para incluir 'medico'. SQLite (usado en tests) no
+        // soporta ALTER TABLE ... MODIFY; ahí se recrea la columna en su lugar.
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('users', function (Blueprint $table) {
+                $table->enum('rol', ['master', 'coordinador', 'visualizador', 'medico'])
+                    ->default('visualizador')->change();
+            });
+        } else {
+            DB::statement("ALTER TABLE users MODIFY rol ENUM('master','coordinador','visualizador','medico') DEFAULT 'visualizador'");
+        }
 
         Schema::table('users', function (Blueprint $table) {
             $table->unsignedBigInteger('medico_id')->nullable()->after('uci_asignada');
@@ -24,6 +32,14 @@ return new class extends Migration
             $table->dropForeign(['medico_id']);
             $table->dropColumn('medico_id');
         });
-        DB::statement("ALTER TABLE users MODIFY rol ENUM('master','coordinador','visualizador') DEFAULT 'visualizador'");
+
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('users', function (Blueprint $table) {
+                $table->enum('rol', ['master', 'coordinador', 'visualizador'])
+                    ->default('visualizador')->change();
+            });
+        } else {
+            DB::statement("ALTER TABLE users MODIFY rol ENUM('master','coordinador','visualizador') DEFAULT 'visualizador'");
+        }
     }
 };
