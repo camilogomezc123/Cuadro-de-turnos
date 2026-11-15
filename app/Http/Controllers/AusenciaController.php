@@ -14,8 +14,8 @@ class AusenciaController extends Controller
     {
         $ucis      = Uci::where('activa', true)->orderBy('nombre')->get();
         $uciId     = $request->integer('uci_id', 0);
-        $estado    = $request->string('estado', '');
-        $tipo      = $request->string('tipo', '');
+        $estado    = (string) $request->string('estado', '');
+        $tipo      = (string) $request->string('tipo', '');
 
         $query = Ausencia::with('medico.uci')
             ->orderByDesc('fecha_inicio');

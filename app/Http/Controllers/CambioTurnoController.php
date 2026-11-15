@@ -26,7 +26,7 @@ class CambioTurnoController extends Controller
     public function index(Request $request)
     {
         $user      = auth()->user();
-        $estado    = $request->string('estado', '');
+        $estado    = (string) $request->string('estado', '');
         $esMaestro = $user->esMaster();
 
         // Los médicos (no-master) solo ven meses activados para ellos; el master ve todos
