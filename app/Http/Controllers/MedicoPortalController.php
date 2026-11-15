@@ -11,6 +11,7 @@ use App\Models\AlertaTurno;
 use App\Models\AuditoriaSistema;
 use App\Services\HoraConsolidadoService;
 use App\Services\ConflictoService;
+use App\Services\CambioTurnoAprobacionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,7 @@ class MedicoPortalController extends Controller
     public function __construct(
         private HoraConsolidadoService $horaService,
         private ConflictoService       $conflictoService,
+        private CambioTurnoAprobacionService $aprobacionService,
     ) {}
 
     private function requireMedico(): void
@@ -311,135 +313,31 @@ class MedicoPortalController extends Controller
 
     public function aprobarCambio(Request $request, SolicitudCambioTurno $solicitud)
     {
-        DB::transaction(function () use ($request, $solicitud) {
-            $solicitud->update([
-                'estado'                  => 'aprobado_por_maestro',
-                'aprobado_por'            => Auth::user()->name,
-                'fecha_aprobacion_maestro'=> now(),
-                'usuario_maestro_aprueba_id'=> Auth::id(),
-                'observacion_maestro'     => $request->observacion,
-                'resuelto_at'             => now(),
-            ]);
-
-            $to = $solicitud->turnoOrigen;
-            $td = $solicitud->turnoDestino;
-
-            if ($solicitud->tipo_movimiento === 'oferta_abierta') {
-                if ($to) {
-                    $to->update([
-                        'medico_id'         => $solicitud->medico_receptor_id,
-                        'estado_turno'      => 'aceptado_por_otro',
-                        'medico_original_id'=> $to->medico_id,
-                        'fue_laborado'      => true,
-                    ]);
+        try {
+            DB::transaction(function () use ($request, $solicitud) {
+                $resultado = $this->aprobacionService->aplicar($solicitud);
+                if (!$resultado['ok']) {
+                    throw new \RuntimeException($resultado['error']);
                 }
-            } elseif ($solicitud->tipo_movimiento === 'donacion_directa') {
-                if ($to) {
-                    $componente = $solicitud->componente_turno ?: $to->codigo_turno;
-                    if ($componente && $solicitud->componente_turno) {
-                        $codigoRestante = CambioTurnoController::restarComponente($to->codigo_turno, $componente);
-                        $horasRestantes = \App\Services\TurnoService::horasPorCodigo($codigoRestante);
-                        $to->update([
-                            'codigo_turno' => $codigoRestante,
-                            'horas_diurnas' => $horasRestantes['diurnas'],
-                            'horas_nocturnas' => $horasRestantes['nocturnas'],
-                            'horas_total' => $horasRestantes['total'],
-                            'estado_turno' => 'aceptado_por_otro',
-                            'medico_original_id' => $to->medico_id,
-                            'fue_laborado' => true,
-                        ]);
 
-                        $tReceptor = TurnoMedico::where('medico_id', $solicitud->medico_receptor_id)
-                            ->where('archivo_id', $to->archivo_id)
-                            ->where('fecha', $to->fecha)
-                            ->first();
+                $solicitud->update([
+                    'estado'                     => 'aprobado_por_maestro',
+                    'aprobado_por'               => Auth::user()->name,
+                    'fecha_aprobacion_maestro'   => now(),
+                    'usuario_maestro_aprueba_id' => Auth::id(),
+                    'observacion_maestro'        => $request->observacion,
+                    'resuelto_at'                => now(),
+                ]);
 
-                        $codigoActual = $tReceptor?->codigo_turno ?? 'LIBRE';
-                        $codigoNuevo = CambioTurnoController::mergeComponente($codigoActual, $componente);
-                        $horasNuevo = \App\Services\TurnoService::horasPorCodigo($codigoNuevo);
-
-                        if ($tReceptor) {
-                            $tReceptor->update([
-                                'codigo_turno' => $codigoNuevo,
-                                'horas_diurnas' => $horasNuevo['diurnas'],
-                                'horas_nocturnas' => $horasNuevo['nocturnas'],
-                                'horas_total' => $horasNuevo['total'],
-                                'estado_turno' => 'programado',
-                            ]);
-                        } else {
-                            $fecha = \Carbon\Carbon::parse($to->fecha);
-                            $dow = $fecha->dayOfWeek;
-                            $idx = ($dow === 0) ? 6 : $dow - 1;
-                            $dias = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
-                            TurnoMedico::create([
-                                'archivo_id' => $to->archivo_id,
-                                'medico_id' => $solicitud->medico_receptor_id,
-                                'uci_id' => $to->uci_id,
-                                'fecha' => $to->fecha,
-                                'dia_numero' => $fecha->day,
-                                'dia_semana' => $dias[$idx],
-                                'codigo_turno' => $codigoNuevo,
-                                'horas_diurnas' => $horasNuevo['diurnas'],
-                                'horas_nocturnas' => $horasNuevo['nocturnas'],
-                                'horas_total' => $horasNuevo['total'],
-                                'es_fin_semana' => in_array($dow, [0,6]),
-                                'es_domingo' => ($dow === 0),
-                                'estado_turno' => 'programado',
-                                'fue_laborado' => true,
-                            ]);
-                        }
-                    } else {
-                        $to->update([
-                            'medico_id' => $solicitud->medico_receptor_id,
-                            'estado_turno' => 'aceptado_por_otro',
-                            'medico_original_id' => $to->medico_id,
-                            'fue_laborado' => true,
-                        ]);
-                    }
-                }
-            } elseif ($solicitud->tipo_movimiento === 'cambio_directo' && $to && $td) {
-                if ($solicitud->componente_turno) {
-                    $componente = strtoupper(trim($solicitud->componente_turno));
-                    $codigoOrigenNuevo = CambioTurnoController::restarComponente($to->codigo_turno, $componente);
-                    $codigoDestinoNuevo = CambioTurnoController::mergeComponente($td->codigo_turno, $componente);
-                    $horasOrigen = \App\Services\TurnoService::horasPorCodigo($codigoOrigenNuevo);
-                    $horasDestino = \App\Services\TurnoService::horasPorCodigo($codigoDestinoNuevo);
-
-                    $to->update([
-                        'codigo_turno' => $codigoOrigenNuevo,
-                        'horas_diurnas' => $horasOrigen['diurnas'],
-                        'horas_nocturnas' => $horasOrigen['nocturnas'],
-                        'horas_total' => $horasOrigen['total'],
-                        'estado_turno' => 'reemplazado',
-                    ]);
-                    $td->update([
-                        'codigo_turno' => $codigoDestinoNuevo,
-                        'horas_diurnas' => $horasDestino['diurnas'],
-                        'horas_nocturnas' => $horasDestino['nocturnas'],
-                        'horas_total' => $horasDestino['total'],
-                        'estado_turno' => 'reemplazado',
-                    ]);
-                } else {
-                    $medicoOrig = $to->medico_id;
-                    $medicoDest = $td->medico_id;
-
-                    $to->update([
-                        'medico_id' => $medicoDest,
-                        'estado_turno' => 'reemplazado',
-                    ]);
-                    $td->update([
-                        'medico_id' => $medicoOrig,
-                        'estado_turno' => 'reemplazado',
-                    ]);
-                }
-            }
-
-            AuditoriaSistema::registrar(
-                'APROBAR_CAMBIO_TURNO','turnos','SolicitudCambioTurno',$solicitud->id,
-                null,['aprobado_por'=>Auth::user()->name],
-                $request->observacion??'',Auth::user()->name
-            );
-        });
+                AuditoriaSistema::registrar(
+                    'APROBAR_CAMBIO_TURNO', 'turnos', 'SolicitudCambioTurno', $solicitud->id,
+                    null, ['aprobado_por' => Auth::user()->name],
+                    $request->observacion ?? '', Auth::user()->name
+                );
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', 'Cambio aprobado y cuadro de turnos actualizado.');
     }

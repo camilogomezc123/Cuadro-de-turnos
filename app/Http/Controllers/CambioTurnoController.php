@@ -8,6 +8,7 @@ use App\Models\Medico;
 use App\Models\ArchivoCargado;
 use App\Models\AuditoriaSistema;
 use App\Models\HorasAutorizacionExtra;
+use App\Services\CambioTurnoAprobacionService;
 use App\Services\TurnoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -15,7 +16,10 @@ use Illuminate\Support\Facades\Cache;
 
 class CambioTurnoController extends Controller
 {
-    public function __construct(private TurnoService $turnoService) {}
+    public function __construct(
+        private TurnoService $turnoService,
+        private CambioTurnoAprobacionService $aprobacionService,
+    ) {}
 
     // ── Vista principal ───────────────────────────────────────────
 
@@ -333,151 +337,9 @@ class CambioTurnoController extends Controller
             return back()->with('error', 'El turno de origen ya no existe (fue marcado como LIBRE).');
         }
 
-        if ($cambio->tipo_movimiento === 'donacion_directa') {
-            // ── Cedencia: el donante pierde el componente; el receptor lo gana ──
-            $comp = $cambio->componente_turno ?? $tOrigen->codigo_turno;
-
-            // Actualizar turno del donante
-            $codigoRestante = self::restarComponente($tOrigen->codigo_turno, $comp);
-            $horasRestantes = TurnoService::horasPorCodigo($codigoRestante);
-            $tOrigen->update([
-                'codigo_turno'        => $codigoRestante,
-                'horas_diurnas'       => $horasRestantes['diurnas'],
-                'horas_nocturnas'     => $horasRestantes['nocturnas'],
-                'horas_total'         => $horasRestantes['total'],
-                'editado_manualmente' => true,
-                'editado_por'         => 'coordinador',
-                'editado_at'          => now(),
-            ]);
-
-            // Buscar o crear turno del receptor en la misma fecha
-            $tReceptor = TurnoMedico::where('medico_id', $cambio->medico_receptor_id)
-                ->where('archivo_id', $tOrigen->archivo_id)
-                ->where('fecha', $tOrigen->fecha)
-                ->first();
-
-            $codigoReceptorActual = $tReceptor?->codigo_turno ?? 'LIBRE';
-            $codigoReceptorNuevo  = self::mergeComponente($codigoReceptorActual, $comp);
-            $horasReceptor        = TurnoService::horasPorCodigo($codigoReceptorNuevo);
-
-            // ── Check 216h receptor ────────────────────────────────
-            $horasRecTotal = $this->horasMedicoEnArchivo($cambio->medico_receptor_id, $tOrigen->archivo_id);
-            $deltaRec      = ($horasReceptor['total'] ?? 0) - ($tReceptor?->horas_total ?? 0);
-            if (($horasRecTotal + $deltaRec) > 216
-                && !$this->tieneAutorizacionHorasExtra($cambio->medico_receptor_id, $tOrigen->archivo_id)) {
-                return back()->with('error', 'No se puede aprobar: el médico receptor superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
-            }
-            // ──────────────────────────────────────────────────────
-
-            if ($tReceptor) {
-                $tReceptor->update([
-                    'codigo_turno'        => $codigoReceptorNuevo,
-                    'horas_diurnas'       => $horasReceptor['diurnas'],
-                    'horas_nocturnas'     => $horasReceptor['nocturnas'],
-                    'horas_total'         => $horasReceptor['total'],
-                    'editado_manualmente' => true,
-                    'editado_por'         => 'coordinador',
-                    'editado_at'          => now(),
-                ]);
-            } else {
-                // Crear nuevo turno para el receptor
-                $fecha  = Carbon::parse($tOrigen->fecha);
-                $dow    = $fecha->dayOfWeek;
-                $idx    = ($dow === 0) ? 6 : $dow - 1;
-                $dias   = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
-                TurnoMedico::create([
-                    'archivo_id'          => $tOrigen->archivo_id,
-                    'medico_id'           => $cambio->medico_receptor_id,
-                    'uci_id'              => $tOrigen->uci_id,
-                    'fecha'               => $tOrigen->fecha,
-                    'dia_numero'          => $fecha->day,
-                    'dia_semana'          => $dias[$idx],
-                    'codigo_turno'        => $codigoReceptorNuevo,
-                    'horas_diurnas'       => $horasReceptor['diurnas'],
-                    'horas_nocturnas'     => $horasReceptor['nocturnas'],
-                    'horas_total'         => $horasReceptor['total'],
-                    'es_fin_semana'       => in_array($dow, [0, 6]),
-                    'es_domingo'          => ($dow === 0),
-                    'estado_turno'        => 'programado',
-                    'fue_laborado'        => true,
-                    'editado_manualmente' => true,
-                    'editado_por'         => 'coordinador',
-                    'editado_at'          => now(),
-                ]);
-            }
-
-            // Recalcular horas de ambos médicos
-            $fecha = Carbon::parse($tOrigen->fecha);
-            $this->turnoService->recalcularIndicadorMedico(
-                $tOrigen->medico_id, $tOrigen->uci_id, $tOrigen->archivo_id,
-                $fecha->month, $fecha->year
-            );
-            $this->turnoService->recalcularIndicadorMedico(
-                $cambio->medico_receptor_id, $tOrigen->uci_id, $tOrigen->archivo_id,
-                $fecha->month, $fecha->year
-            );
-
-        } else {
-            // ── Cambio directo: intercambiar turnos completos ──
-            $tDestino = $cambio->turnoDestino;
-
-            if (!$tDestino) {
-                return back()->with('error',
-                    'No se puede aprobar: el médico receptor aún no indicó cuál de sus turnos ofrece a cambio.'
-                );
-            }
-
-            if ($tOrigen && $tDestino) {
-                [$codigoA, $codigoB] = [$tOrigen->codigo_turno, $tDestino->codigo_turno];
-                $horasA = TurnoService::horasPorCodigo($codigoB); // solicitante recibirá codigoB
-                $horasB = TurnoService::horasPorCodigo($codigoA); // receptor recibirá codigoA
-
-                // ── Check 216h solicitante ─────────────────────────
-                $hSolAct = $this->horasMedicoEnArchivo($tOrigen->medico_id, $tOrigen->archivo_id);
-                $deltaSol = ($horasA['total'] ?? 0) - ($tOrigen->horas_total ?? 0);
-                if (($hSolAct + $deltaSol) > 216
-                    && !$this->tieneAutorizacionHorasExtra($tOrigen->medico_id, $tOrigen->archivo_id)) {
-                    return back()->with('error', 'No se puede aprobar: el médico solicitante superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
-                }
-                // ── Check 216h receptor ────────────────────────────
-                $hRecAct = $this->horasMedicoEnArchivo($tDestino->medico_id, $tDestino->archivo_id);
-                $deltaRec = ($horasB['total'] ?? 0) - ($tDestino->horas_total ?? 0);
-                if (($hRecAct + $deltaRec) > 216
-                    && !$this->tieneAutorizacionHorasExtra($tDestino->medico_id, $tDestino->archivo_id)) {
-                    return back()->with('error', 'No se puede aprobar: el médico receptor superaría el límite de 216 h en este período. Solicita autorización de horas extra primero.');
-                }
-                // ──────────────────────────────────────────────────
-
-                $tOrigen->update([
-                    'codigo_turno'        => $codigoB,
-                    'horas_diurnas'       => $horasA['diurnas'],
-                    'horas_nocturnas'     => $horasA['nocturnas'],
-                    'horas_total'         => $horasA['total'],
-                    'editado_manualmente' => true,
-                    'editado_por'         => 'coordinador',
-                    'editado_at'          => now(),
-                ]);
-                $tDestino->update([
-                    'codigo_turno'        => $codigoA,
-                    'horas_diurnas'       => $horasB['diurnas'],
-                    'horas_nocturnas'     => $horasB['nocturnas'],
-                    'horas_total'         => $horasB['total'],
-                    'editado_manualmente' => true,
-                    'editado_por'         => 'coordinador',
-                    'editado_at'          => now(),
-                ]);
-
-                $fechaO = Carbon::parse($tOrigen->fecha);
-                $fechaD = Carbon::parse($tDestino->fecha);
-                $this->turnoService->recalcularIndicadorMedico(
-                    $tOrigen->medico_id, $tOrigen->uci_id, $tOrigen->archivo_id,
-                    $fechaO->month, $fechaO->year
-                );
-                $this->turnoService->recalcularIndicadorMedico(
-                    $tDestino->medico_id, $tDestino->uci_id, $tDestino->archivo_id,
-                    $fechaD->month, $fechaD->year
-                );
-            }
+        $resultado = $this->aprobacionService->aplicar($cambio);
+        if (!$resultado['ok']) {
+            return back()->with('error', $resultado['error']);
         }
 
         $cambio->update(['estado' => 'aprobado_coordinador', 'aprobado_por' => 'coordinador', 'resuelto_at' => now()]);
