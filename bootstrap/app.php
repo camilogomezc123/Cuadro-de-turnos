@@ -16,13 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'master' => \App\Http\Middleware\SoloMaster::class,
         ]);
-        $middleware->web(append: [
-            \App\Http\Middleware\AutoLoginLocal::class,
-        ]);
-        $middleware->appendToPriorityList(
-            after: \Illuminate\Session\Middleware\StartSession::class,
-            append: \App\Http\Middleware\AutoLoginLocal::class,
-        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(fn ($request, $exception) =>

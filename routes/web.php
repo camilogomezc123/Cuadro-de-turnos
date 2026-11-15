@@ -59,7 +59,7 @@ Route::middleware('auth')->prefix('burnout')->name('burnout.')->group(function (
 // ── Rutas protegidas ────────────────────────────────────────────
 Route::middleware('auth')->group(function () {
 
-    Route::get('/', fn () => redirect()->route('dashboard.index'));
+    Route::redirect('/', '/dashboard');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
