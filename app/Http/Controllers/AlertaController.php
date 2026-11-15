@@ -20,9 +20,9 @@ class AlertaController extends Controller
         // archivo más reciente y ocultaba alertas abiertas de meses anteriores.
         $archivoId  = $request->integer('archivo_id', 0);
         $uciId      = $request->integer('uci_id', 0);
-        $prioridad  = $request->string('prioridad', '');
-        $estado     = $request->string('estado', 'abierta');
-        $tipo       = $request->string('tipo', '');
+        $prioridad  = (string) $request->string('prioridad', '');
+        $estado     = (string) $request->string('estado', 'abierta');
+        $tipo       = (string) $request->string('tipo', '');
 
         $query = AlertaTurno::with(['medico', 'uci'])
             ->orderByRaw("FIELD(prioridad, 'alta', 'media', 'baja')")
