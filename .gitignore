@@ -28,3 +28,9 @@ Thumbs.db
 *.xls
 diagnostico_excel.php
 test_parser.php
+
+# Microservicio de WhatsApp
+/whatsapp-service/node_modules
+/whatsapp-service/.wwebjs_auth
+/whatsapp-service/.wwebjs_cache
+/whatsapp-service/.env

@@ -33,11 +33,35 @@ class CambioTurnoAprobacionService
             return ['ok' => false, 'error' => 'El turno de origen ya no existe.'];
         }
 
-        return match ($solicitud->tipo_movimiento) {
+        $resultado = match ($solicitud->tipo_movimiento) {
             'oferta_abierta'   => $this->aplicarReasignacionCompleta($solicitud, $tOrigen),
             'donacion_directa' => $this->aplicarDonacion($solicitud, $tOrigen),
             default            => $this->aplicarCambioDirecto($solicitud, $tOrigen),
         };
+
+        if ($resultado['ok']) {
+            $this->notificarAprobacion($solicitud, $tOrigen);
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * Avisa por WhatsApp a ambos médicos involucrados. Se hace aquí (y no en cada
+     * controlador) para que la notificación salga igual sin importar desde qué
+     * pantalla se aprobó el cambio.
+     */
+    private function notificarAprobacion(SolicitudCambioTurno $solicitud, TurnoMedico $tOrigen): void
+    {
+        $fechaTexto = Carbon::parse($tOrigen->fecha)->translatedFormat('d \d\e F');
+        foreach ([$solicitud->medicoSolicitante, $solicitud->medicoReceptor] as $medico) {
+            if ($medico) {
+                WhatsappService::enviar(
+                    $medico->telefono,
+                    "Hola {$medico->nombre}, el cambio de turno del {$fechaTexto} fue aprobado. Ya quedó aplicado en el cuadro."
+                );
+            }
+        }
     }
 
     // ── Oferta abierta / donación completa: el turno pasa entero al receptor ──

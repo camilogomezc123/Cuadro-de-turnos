@@ -1,0 +1,16 @@
+{
+  "name": "whatsapp-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Microservicio que conecta la API de Cuadro de Turnos con WhatsApp Web para enviar alertas de cambios de turno.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

@@ -10,6 +10,7 @@ use App\Models\AuditoriaSistema;
 use App\Models\HorasAutorizacionExtra;
 use App\Services\CambioTurnoAprobacionService;
 use App\Services\TurnoService;
+use App\Services\WhatsappService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -213,14 +214,25 @@ class CambioTurnoController extends Controller
         Cache::forget('sidebar_medico_pendientes_' . $data['medico_receptor_id']);
 
         // Notificar al médico receptor por email
+        $receptor = Medico::find($data['medico_receptor_id']);
         try {
-            $receptor = Medico::find($data['medico_receptor_id']);
             if ($receptor && $receptor->email) {
                 \Illuminate\Support\Facades\Mail::to($receptor->email)
                     ->send(new \App\Mail\SolicitudCambioTurnoMail($solicitud));
             }
         } catch (\Throwable $e) {
             // Email falla silenciosamente (driver puede ser 'log')
+        }
+
+        // Notificar al médico receptor por WhatsApp
+        if ($receptor) {
+            $solicitante = $turnoOrigen->medico;
+            WhatsappService::enviar(
+                $receptor->telefono,
+                "Hola {$receptor->nombre}, {$solicitante?->nombre_completo} te envió una solicitud de {$tipoLabel} de turno "
+                . "para el " . Carbon::parse($turnoOrigen->fecha)->translatedFormat('d \d\e F') . ". "
+                . "Ingresa al sistema para responder."
+            );
         }
 
         $msg = $tipo === 'donacion_directa'
@@ -288,6 +300,15 @@ class CambioTurnoController extends Controller
             'respondido_colega_at' => now(),
         ]);
         AuditoriaSistema::registrar('RECHAZAR_CAMBIO_COLEGA', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
+
+        $solicitante = $cambio->medicoSolicitante;
+        if ($solicitante) {
+            WhatsappService::enviar(
+                $solicitante->telefono,
+                "Hola {$solicitante->nombre}, tu colega rechazó la solicitud de cambio de turno que le enviaste. Puedes revisarla en el sistema."
+            );
+        }
+
         return back()->with('success', 'Solicitud rechazada.');
     }
 
@@ -360,6 +381,15 @@ class CambioTurnoController extends Controller
         ]);
         AuditoriaSistema::registrar('RECHAZAR_CAMBIO', 'cambios_turno', 'SolicitudCambioTurno', $cambio->id);
         Cache::forget('sidebar_cambios_pendientes');
+
+        $solicitante = $cambio->medicoSolicitante;
+        if ($solicitante) {
+            WhatsappService::enviar(
+                $solicitante->telefono,
+                "Hola {$solicitante->nombre}, el coordinador rechazó tu solicitud de cambio de turno. Motivo: {$cambio->motivo_coordinador}"
+            );
+        }
+
         return back()->with('success', 'Solicitud rechazada por el coordinador.');
     }
 
