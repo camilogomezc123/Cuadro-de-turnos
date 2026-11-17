@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
 const PORT = process.env.PORT || 3001;
@@ -14,6 +15,7 @@ if (!API_KEY) {
 }
 
 let clienteListo = false;
+let ultimoQr = null;
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '.wwebjs_auth' }),
@@ -24,7 +26,8 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    console.log('\nEscanea este código QR desde WhatsApp (Dispositivos vinculados) UNA SOLA VEZ:\n');
+    ultimoQr = qr;
+    console.log('\nQR actualizado. Ábrelo en el navegador: http://localhost:' + PORT + '/qr?key=' + API_KEY + '\n');
     qrcode.generate(qr, { small: true });
 });
 
@@ -35,6 +38,7 @@ client.on('ready', () => {
 
 client.on('disconnected', (motivo) => {
     clienteListo = false;
+    ultimoQr = null;
     console.error('WhatsApp se desconectó:', motivo);
 });
 
@@ -50,6 +54,27 @@ function normalizarTelefono(telefono) {
 
 const app = express();
 app.use(express.json());
+
+// Sin autenticación por header para poder abrirla directo en el navegador (solo localhost).
+app.get('/qr', async (req, res) => {
+    if (req.query.key !== API_KEY) {
+        return res.status(401).send('Clave inválida.');
+    }
+    if (clienteListo) {
+        return res.status(200).send('WhatsApp ya está conectado. No hay QR pendiente.');
+    }
+    if (!ultimoQr) {
+        return res.status(202).send('Todavía no se generó el QR, espera unos segundos y refresca.');
+    }
+    try {
+        const buffer = await QRCode.toBuffer(ultimoQr, { width: 400 });
+        res.set('Content-Type', 'image/png');
+        res.set('Cache-Control', 'no-store');
+        res.send(buffer);
+    } catch (e) {
+        res.status(500).send('No se pudo generar la imagen del QR.');
+    }
+});
 
 app.use((req, res, next) => {
     if (req.header('X-API-KEY') !== API_KEY) {

@@ -34,3 +34,4 @@ test_parser.php
 /whatsapp-service/.wwebjs_auth
 /whatsapp-service/.wwebjs_cache
 /whatsapp-service/.env
+/whatsapp-service/qr.png

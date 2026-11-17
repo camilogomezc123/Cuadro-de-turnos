@@ -36,9 +36,17 @@ return [
     ],
 
     'whatsapp' => [
+        'activo'  => env('WHATSAPP_ACTIVO', false),
+        'driver'  => env('WHATSAPP_DRIVER', 'local'), // 'local' (whatsapp-web.js) o 'evolution' (Evolution API)
         'url'     => env('WHATSAPP_API_URL', 'http://127.0.0.1:3001'),
         'api_key' => env('WHATSAPP_API_KEY'),
-        'activo'  => env('WHATSAPP_ACTIVO', false),
+    ],
+
+    'evolution' => [
+        'url'            => env('EVOLUTION_URL', 'http://127.0.0.1:8088'),
+        'instance'       => env('EVOLUTION_INSTANCE'),
+        'token'          => env('EVOLUTION_TOKEN'),
+        'webhook_secret' => env('EVOLUTION_WEBHOOK_SECRET'),
     ],
 
 ];
