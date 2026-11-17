@@ -12,6 +12,10 @@ Route::get('/v1/turnos', \App\Http\Controllers\Api\TurnosController::class)
 Route::post('/whatsapp/webhook', \App\Http\Controllers\Api\WhatsappWebhookController::class . '@handle')
     ->name('api.whatsapp.webhook');
 
+Route::post('/whatsapp/enviar', \App\Http\Controllers\Api\WhatsappEnviarController::class . '@handle')
+    ->middleware('throttle:30,1')
+    ->name('api.whatsapp.enviar');
+
 Route::get('/medicos', function (Request $request) {
     $archivoId = $request->get('archivo_id');
 

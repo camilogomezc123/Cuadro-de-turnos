@@ -45,6 +45,9 @@ return [
         'test_override' => env('WHATSAPP_TEST_OVERRIDE'),
         // Destinatario de los resúmenes de turnos (número o, más adelante, JID de grupo).
         'resumen_destino' => env('WHATSAPP_RESUMEN_DESTINO'),
+        // Clave para que automatizaciones externas (p.ej. Codex/ChatGPT) pidan el envío
+        // de un WhatsApp a través de esta app, sin necesitar su propia sesión de WhatsApp.
+        'inbound_key' => env('WHATSAPP_INBOUND_KEY'),
     ],
 
     'evolution' => [

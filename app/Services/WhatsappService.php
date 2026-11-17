@@ -95,6 +95,11 @@ class WhatsappService
 
     private static function normalizarNumero(string $telefono): string
     {
+        // JID ya formado (número o grupo, p.ej. ...@s.whatsapp.net o ...@g.us): no tocar.
+        if (str_contains($telefono, '@')) {
+            return $telefono;
+        }
+
         $numero = preg_replace('/\D/', '', $telefono) ?? '';
 
         if (strlen($numero) <= 10) {
