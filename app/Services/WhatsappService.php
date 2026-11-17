@@ -19,6 +19,11 @@ class WhatsappService
             return false;
         }
 
+        if ($override = config('services.whatsapp.test_override')) {
+            $mensaje = "[a {$telefono}] {$mensaje}";
+            $telefono = $override;
+        }
+
         return match (config('services.whatsapp.driver', 'local')) {
             'evolution' => self::enviarViaEvolution($telefono, $mensaje),
             default => self::enviarViaLocal($telefono, $mensaje),
@@ -65,8 +70,8 @@ class WhatsappService
             $respuesta = Http::withHeaders(['apikey' => config('services.evolution.token')])
                 ->timeout(10)
                 ->post($url, [
-                    'number'      => self::normalizarNumero($telefono),
-                    'textMessage' => ['text' => $mensaje],
+                    'number' => self::normalizarNumero($telefono),
+                    'text'   => $mensaje,
                 ]);
 
             if (!$respuesta->successful()) {

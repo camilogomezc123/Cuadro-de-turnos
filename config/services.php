@@ -36,10 +36,15 @@ return [
     ],
 
     'whatsapp' => [
-        'activo'  => env('WHATSAPP_ACTIVO', false),
-        'driver'  => env('WHATSAPP_DRIVER', 'local'), // 'local' (whatsapp-web.js) o 'evolution' (Evolution API)
-        'url'     => env('WHATSAPP_API_URL', 'http://127.0.0.1:3001'),
-        'api_key' => env('WHATSAPP_API_KEY'),
+        'activo'        => env('WHATSAPP_ACTIVO', false),
+        'driver'        => env('WHATSAPP_DRIVER', 'local'), // 'local' (whatsapp-web.js) o 'evolution' (Evolution API)
+        'url'           => env('WHATSAPP_API_URL', 'http://127.0.0.1:3001'),
+        'api_key'       => env('WHATSAPP_API_KEY'),
+        // Si está lleno, TODOS los mensajes (sin importar el destinatario real) se redirigen
+        // aquí. Para probar en producción sin arriesgarse a notificar a médicos reales.
+        'test_override' => env('WHATSAPP_TEST_OVERRIDE'),
+        // Destinatario de los resúmenes de turnos (número o, más adelante, JID de grupo).
+        'resumen_destino' => env('WHATSAPP_RESUMEN_DESTINO'),
     ],
 
     'evolution' => [
