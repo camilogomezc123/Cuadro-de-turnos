@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Medico;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -52,6 +53,10 @@ class WhatsappService
 
     private static function enviarViaLocal(string $telefono, string $mensaje): bool
     {
+        if (!self::respetarLimiteEnvio()) {
+            return false;
+        }
+
         $url = rtrim((string) config('services.whatsapp.url'), '/') . '/enviar';
 
         try {
@@ -81,8 +86,50 @@ class WhatsappService
         }
     }
 
+    /**
+     * Antiabuso: evita que WhatsApp marque el número por enviar demasiados
+     * mensajes o muy pegados entre sí. Espera (sleep) si hace falta separación,
+     * y bloquea el envío por completo si ya se alcanzó el tope diario.
+     * Devuelve false si el envío debe cancelarse por tope diario alcanzado.
+     */
+    private static function respetarLimiteEnvio(): bool
+    {
+        $hoy = now()->format('Y-m-d');
+        $claveContador = "whatsapp:enviados:{$hoy}";
+        $limiteDiario = (int) config('services.whatsapp.limite_diario', 150);
+
+        $enviadosHoy = (int) Cache::get($claveContador, 0);
+        if ($enviadosHoy >= $limiteDiario) {
+            Log::warning('WhatsApp: tope diario de mensajes alcanzado, envío cancelado', [
+                'enviados_hoy' => $enviadosHoy,
+                'limite_diario' => $limiteDiario,
+            ]);
+            return false;
+        }
+
+        $intervaloMinimo = (int) config('services.whatsapp.intervalo_minimo_segundos', 20);
+        $claveUltimoEnvio = 'whatsapp:ultimo_envio_en';
+        $ultimoEnvio = Cache::get($claveUltimoEnvio);
+
+        if ($ultimoEnvio) {
+            $segundosDesdeUltimo = now()->diffInSeconds(\Illuminate\Support\Carbon::parse($ultimoEnvio));
+            if ($segundosDesdeUltimo < $intervaloMinimo) {
+                sleep($intervaloMinimo - $segundosDesdeUltimo);
+            }
+        }
+
+        Cache::put($claveUltimoEnvio, now()->toDateTimeString(), now()->addMinutes(10));
+        Cache::put($claveContador, $enviadosHoy + 1, now()->endOfDay());
+
+        return true;
+    }
+
     private static function enviarViaEvolution(string $telefono, string $mensaje): bool
     {
+        if (!self::respetarLimiteEnvio()) {
+            return false;
+        }
+
         $instancia = config('services.evolution.instance');
         $url = rtrim((string) config('services.evolution.url'), '/') . "/message/sendText/{$instancia}";
 
@@ -130,6 +177,10 @@ class WhatsappService
 
         if (config('services.whatsapp.driver', 'local') !== 'evolution') {
             Log::warning('WhatsApp: enviarImagen solo soporta el driver evolution');
+            return false;
+        }
+
+        if (!self::respetarLimiteEnvio()) {
             return false;
         }
 

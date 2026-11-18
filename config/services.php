@@ -48,6 +48,10 @@ return [
         // Clave para que automatizaciones externas (p.ej. Codex/ChatGPT) pidan el envío
         // de un WhatsApp a través de esta app, sin necesitar su propia sesión de WhatsApp.
         'inbound_key' => env('WHATSAPP_INBOUND_KEY'),
+        // Antiabuso: separación mínima entre envíos y tope diario, para que WhatsApp
+        // no marque el número por actividad masiva o automatizada.
+        'intervalo_minimo_segundos' => env('WHATSAPP_INTERVALO_MINIMO_SEGUNDOS', 20),
+        'limite_diario' => env('WHATSAPP_LIMITE_DIARIO', 150),
     ],
 
     'evolution' => [
