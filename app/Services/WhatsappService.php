@@ -113,6 +113,58 @@ class WhatsappService
         }
     }
 
+    /**
+     * Envía una imagen (URL pública) con pie de foto opcional. Mismas reglas de
+     * activo/override que enviar(); solo soporta el driver 'evolution'.
+     */
+    public static function enviarImagen(?string $telefono, string $urlImagen, string $caption = '', bool $ignorarOverride = false): bool
+    {
+        if (!config('services.whatsapp.activo') || !$telefono) {
+            return false;
+        }
+
+        if (!$ignorarOverride && ($override = config('services.whatsapp.test_override'))) {
+            $caption = "[a {$telefono}] {$caption}";
+            $telefono = $override;
+        }
+
+        if (config('services.whatsapp.driver', 'local') !== 'evolution') {
+            Log::warning('WhatsApp: enviarImagen solo soporta el driver evolution');
+            return false;
+        }
+
+        $instancia = config('services.evolution.instance');
+        $url = rtrim((string) config('services.evolution.url'), '/') . "/message/sendMedia/{$instancia}";
+
+        try {
+            $respuesta = Http::withHeaders(['apikey' => config('services.evolution.token')])
+                ->timeout(20)
+                ->post($url, [
+                    'number'    => self::normalizarNumero($telefono),
+                    'mediatype' => 'image',
+                    'media'     => $urlImagen,
+                    'caption'   => $caption,
+                ]);
+
+            if (!$respuesta->successful()) {
+                Log::warning('WhatsApp (evolution): error enviando imagen', [
+                    'telefono' => $telefono,
+                    'status'   => $respuesta->status(),
+                    'body'     => $respuesta->body(),
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('WhatsApp (evolution): no se pudo enviar la imagen', [
+                'telefono' => $telefono,
+                'error'    => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
     private static function normalizarNumero(string $telefono): string
     {
         // JID ya formado (número o grupo, p.ej. ...@s.whatsapp.net o ...@g.us): no tocar.

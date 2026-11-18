@@ -23,11 +23,18 @@ class WhatsappEnviarController extends Controller
         }
 
         $datos = $request->validate([
-            'telefono' => ['required', 'string', 'max:50'],
-            'mensaje'  => ['required', 'string', 'max:4096'],
+            'telefono'    => ['required', 'string', 'max:50'],
+            'mensaje'     => ['nullable', 'string', 'max:4096'],
+            'imagen_url'  => ['nullable', 'url', 'max:2048'],
         ]);
 
-        $ok = WhatsappService::enviar($datos['telefono'], $datos['mensaje']);
+        if (!empty($datos['imagen_url'])) {
+            $ok = WhatsappService::enviarImagen($datos['telefono'], $datos['imagen_url'], $datos['mensaje'] ?? '');
+        } elseif (!empty($datos['mensaje'])) {
+            $ok = WhatsappService::enviar($datos['telefono'], $datos['mensaje']);
+        } else {
+            return response()->json(['ok' => false, 'error' => 'Falta mensaje o imagen_url.'], 422);
+        }
 
         return response()->json(['ok' => $ok], $ok ? 200 : 502);
     }
