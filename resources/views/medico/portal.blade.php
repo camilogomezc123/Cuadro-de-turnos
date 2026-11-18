@@ -18,6 +18,7 @@
 .cal-cell.weekend{background:#fafbff}.cal-cell.today{border-color:#2196F3;background:#e3f2fd}
 .cal-cell .day-num{font-weight:700;font-size:.8rem;display:block;margin-bottom:1px}
 .cal-cell .dia-let{font-size:.6rem;color:#9aa5c0;display:block}
+.cal-grid-7{display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem}
 </style>
 @endpush
 
@@ -200,18 +201,18 @@
                     cuando se active vas a poder verlo y gestionar cambios de turno sobre él.
                 </div>
             @endif
-            <div class="row g-1 mb-2 text-center">
+            <div class="cal-grid-7 mb-2 text-center">
                 @foreach(['Lu','Ma','Mi','Ju','Vi','Sá','Do'] as $d)
-                    <div class="col"><small class="fw-bold text-muted">{{ $d }}</small></div>
+                    <div><small class="fw-bold text-muted">{{ $d }}</small></div>
                 @endforeach
             </div>
             @php
                 $primerDia = \Carbon\Carbon::create($anio,$mes,1)->dayOfWeek;
                 $offsetDias = $primerDia === 0 ? 6 : $primerDia - 1;
             @endphp
-            <div class="row g-1">
+            <div class="cal-grid-7">
                 @for($i=0;$i<$offsetDias;$i++)
-                    <div class="col"><div style="min-height:58px"></div></div>
+                    <div><div style="min-height:58px"></div></div>
                 @endfor
                 @foreach($calendario as $dNum => $info)
                 @php
@@ -220,7 +221,7 @@
                     $esHoy     = \Carbon\Carbon::parse($info['fecha'])->isToday();
                     $turnosDia = $info['turnos']->filter(fn($t) => filled($t->codigo_turno));
                 @endphp
-                <div class="col">
+                <div>
                     <div class="cal-cell {{ $esFin?'weekend':'' }} {{ $esHoy?'today':'' }}">
                         <span class="dia-let">{{ ['Do','Lu','Ma','Mi','Ju','Vi','Sá'][$dow] }}</span>
                         <span class="day-num">{{ $dNum }}</span>
