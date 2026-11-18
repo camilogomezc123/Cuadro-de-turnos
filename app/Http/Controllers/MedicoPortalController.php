@@ -436,6 +436,8 @@ class MedicoPortalController extends Controller
             'email'            => 'required|email|unique:users,email,'.$user->id,
             'password_actual'  => 'required',
             'password'         => 'nullable|min:6|confirmed',
+            'telefono'         => 'nullable|string|max:20',
+            'whatsapp_notificaciones' => 'nullable|boolean',
         ]);
 
         if (!Hash::check($request->password_actual, $user->password)) {
@@ -451,7 +453,48 @@ class MedicoPortalController extends Controller
         }
 
         $user->update($data);
+
+        if ($user->medico) {
+            $user->medico->update([
+                'telefono'                   => $request->telefono,
+                'whatsapp_notificaciones'    => $request->boolean('whatsapp_notificaciones'),
+                'whatsapp_consentimiento_en' => now(),
+            ]);
+        }
+
         return back()->with('cred_success', 'Tus credenciales han sido actualizadas.');
+    }
+
+    // ── WhatsApp: captura de teléfono y consentimiento ────────────
+
+    public function whatsappVerificar(Request $request)
+    {
+        $this->requireMedico();
+        $medico = Auth::user()->medico;
+
+        return response()->json([
+            'mostrar'  => is_null($medico->whatsapp_consentimiento_en),
+            'telefono' => $medico->telefono,
+        ]);
+    }
+
+    public function whatsappGuardarPreferencia(Request $request)
+    {
+        $this->requireMedico();
+        $medico = Auth::user()->medico;
+
+        $data = $request->validate([
+            'telefono' => 'nullable|string|max:20',
+            'acepta'   => 'required|boolean',
+        ]);
+
+        $medico->update([
+            'telefono'                   => $data['telefono'],
+            'whatsapp_notificaciones'    => $data['acepta'] && filled($data['telefono']),
+            'whatsapp_consentimiento_en' => now(),
+        ]);
+
+        return response()->json(['ok' => true]);
     }
 
     // ── API: turnos de un médico para un mes ─────────────────────

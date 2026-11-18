@@ -14,9 +14,8 @@ Schedule::command('turnos:recordatorios')->everyFifteenMinutes();
 // Envía y archiva el consolidado mensual el último día de cada mes a las 22:30.
 Schedule::command('turnos:enviar-mensual')->lastDayOfMonth('22:30');
 
-// Resumen de quién está de turno hoy por WhatsApp, lunes a viernes 07:00 (America/Bogota).
-Schedule::command('turnos:resumen-diario-whatsapp')->weekdays()->at('07:00')->timezone('America/Bogota');
+// Resumen de quién está de turno hoy (día y noche) al grupo de la UCI, todos los días 06:30 (America/Bogota).
+Schedule::command('turnos:resumen-diario-whatsapp')->dailyAt('06:30')->timezone('America/Bogota');
 
-// Anticipo del turno nocturno por WhatsApp: lunes a jueves 16:00, viernes 15:30 (America/Bogota).
-Schedule::command('turnos:anticipo-nocturno-whatsapp')->days([1, 2, 3, 4])->at('16:00')->timezone('America/Bogota');
-Schedule::command('turnos:anticipo-nocturno-whatsapp')->fridays()->at('15:30')->timezone('America/Bogota');
+// Anticipo del turno nocturno de hoy al grupo de la UCI, todos los días 18:30 (America/Bogota).
+Schedule::command('turnos:anticipo-nocturno-whatsapp')->dailyAt('18:30')->timezone('America/Bogota');

@@ -14,6 +14,7 @@ class Medico extends Model
 
     protected $fillable = [
         'nombre', 'apellido', 'documento', 'especialidad', 'email', 'telefono',
+        'whatsapp_notificaciones', 'whatsapp_consentimiento_en',
         'uci_id', 'activo', 'puede_ingresar_sistema', 'fecha_creacion_usuario',
     ];
 
@@ -36,9 +37,11 @@ class Medico extends Model
     }
 
     protected $casts = [
-        'activo'                 => 'boolean',
-        'puede_ingresar_sistema' => 'boolean',
-        'fecha_creacion_usuario' => 'datetime',
+        'activo'                     => 'boolean',
+        'puede_ingresar_sistema'     => 'boolean',
+        'fecha_creacion_usuario'     => 'datetime',
+        'whatsapp_notificaciones'    => 'boolean',
+        'whatsapp_consentimiento_en' => 'datetime',
     ];
 
     public function getNombreCompletoAttribute(): string

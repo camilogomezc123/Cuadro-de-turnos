@@ -227,8 +227,8 @@ class CambioTurnoController extends Controller
         // Notificar al médico receptor por WhatsApp
         if ($receptor) {
             $solicitante = $turnoOrigen->medico;
-            WhatsappService::enviar(
-                $receptor->telefono,
+            WhatsappService::notificarMedico(
+                $receptor,
                 "Hola {$receptor->nombre}, {$solicitante?->nombre_completo} te envió una solicitud de {$tipoLabel} de turno "
                 . "para el " . Carbon::parse($turnoOrigen->fecha)->translatedFormat('d \d\e F') . ". "
                 . "Ingresa al sistema para responder."
@@ -303,8 +303,8 @@ class CambioTurnoController extends Controller
 
         $solicitante = $cambio->medicoSolicitante;
         if ($solicitante) {
-            WhatsappService::enviar(
-                $solicitante->telefono,
+            WhatsappService::notificarMedico(
+                $solicitante,
                 "Hola {$solicitante->nombre}, tu colega rechazó la solicitud de cambio de turno que le enviaste. Puedes revisarla en el sistema."
             );
         }
@@ -384,8 +384,8 @@ class CambioTurnoController extends Controller
 
         $solicitante = $cambio->medicoSolicitante;
         if ($solicitante) {
-            WhatsappService::enviar(
-                $solicitante->telefono,
+            WhatsappService::notificarMedico(
+                $solicitante,
                 "Hola {$solicitante->nombre}, el coordinador rechazó tu solicitud de cambio de turno. Motivo: {$cambio->motivo_coordinador}"
             );
         }

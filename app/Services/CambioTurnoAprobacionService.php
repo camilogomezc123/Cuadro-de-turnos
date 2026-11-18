@@ -56,8 +56,8 @@ class CambioTurnoAprobacionService
         $fechaTexto = Carbon::parse($tOrigen->fecha)->translatedFormat('d \d\e F');
         foreach ([$solicitud->medicoSolicitante, $solicitud->medicoReceptor] as $medico) {
             if ($medico) {
-                WhatsappService::enviar(
-                    $medico->telefono,
+                WhatsappService::notificarMedico(
+                    $medico,
                     "Hola {$medico->nombre}, el cambio de turno del {$fechaTexto} fue aprobado. Ya quedó aplicado en el cuadro."
                 );
             }

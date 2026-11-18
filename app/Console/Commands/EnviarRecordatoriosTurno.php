@@ -52,8 +52,8 @@ class EnviarRecordatoriosTurno extends Command
                 $medico->notify(new RecordatorioTurno($turno));
             }
 
-            WhatsappService::enviar(
-                $medico->telefono,
+            WhatsappService::notificarMedico(
+                $medico,
                 "Hola {$medico->nombre}, recuerda que tienes turno {$turno->codigo_turno} en {$turno->uci?->nombre} "
                 . "el " . $inicio->translatedFormat('d \d\e F') . " a las " . $inicio->format('H:i') . "."
             );

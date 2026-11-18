@@ -47,6 +47,8 @@ Route::middleware('auth')->prefix('mi-portal')->name('medico.')->group(function 
     Route::get('/turnos-medico',                           [MedicoPortalController::class, 'turnosMedico'])  ->name('turnos-api');
     Route::get('/candidatos-cambio',                       [MedicoPortalController::class, 'candidatosCambio'])->name('candidatos-api');
     Route::patch('/credenciales',                          [MedicoPortalController::class, 'actualizarCredenciales'])->name('credenciales');
+    Route::get('/whatsapp/verificar',                      [MedicoPortalController::class, 'whatsappVerificar'])->name('whatsapp.verificar');
+    Route::post('/whatsapp/preferencia',                   [MedicoPortalController::class, 'whatsappGuardarPreferencia'])->name('whatsapp.preferencia');
 });
 
 // ── Burnout: rutas accesibles por todos los usuarios autenticados ──

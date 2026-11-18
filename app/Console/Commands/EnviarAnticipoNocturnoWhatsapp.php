@@ -63,7 +63,7 @@ class EnviarAnticipoNocturnoWhatsapp extends Command
             return self::FAILURE;
         }
 
-        $ok = WhatsappService::enviar($destino, $mensaje);
+        $ok = WhatsappService::enviar($destino, $mensaje, ignorarOverride: true);
         $this->info($ok ? 'Anticipo nocturno enviado.' : 'No se pudo enviar el anticipo nocturno (revisa los logs).');
 
         return $ok ? self::SUCCESS : self::FAILURE;

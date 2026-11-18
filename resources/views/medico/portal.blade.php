@@ -530,6 +530,21 @@
                                value="{{ old('email', auth()->user()->email) }}" required>
                     </div>
                     <hr class="my-3">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Teléfono (WhatsApp)</label>
+                        <input type="tel" name="telefono" class="form-control"
+                               value="{{ old('telefono', auth()->user()->medico?->telefono) }}"
+                               placeholder="Ej: 3001234567">
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="credWhatsapp"
+                               name="whatsapp_notificaciones" value="1"
+                               @checked(old('whatsapp_notificaciones', auth()->user()->medico?->whatsapp_notificaciones))>
+                        <label class="form-check-label" for="credWhatsapp">
+                            Quiero recibir notificaciones por WhatsApp (cambios de turno, recordatorios)
+                        </label>
+                    </div>
+                    <hr class="my-3">
                     <p class="small text-muted mb-2">Deja en blanco si no deseas cambiar la contraseña.</p>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Contraseña actual <span class="text-danger">*</span></label>
@@ -567,6 +582,63 @@
         </div>
     </div>
 </div>
+
+{{-- Modal captación de teléfono / consentimiento WhatsApp --}}
+<div class="modal fade" id="modalWhatsapp" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px">
+            <div class="modal-header border-0 pb-1">
+                <h5 class="modal-title fw-bold"><i class="bi bi-whatsapp me-2 text-success"></i>Notificaciones por WhatsApp</h5>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">
+                    ¿Quieres que te avisemos por WhatsApp cuando haya cambios en tus turnos (solicitudes, aprobaciones, recordatorios)?
+                    Puedes cambiar esta decisión cuando quieras desde "Mi cuenta".
+                </p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Tu número de WhatsApp</label>
+                    <input type="tel" id="wa-telefono" class="form-control" placeholder="Ej: 3001234567">
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" id="wa-no" class="btn btn-outline-secondary">No, gracias</button>
+                <button type="button" id="wa-si" class="btn btn-success">
+                    <i class="bi bi-check-lg me-1"></i>Sí, avísenme
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    fetch('{{ route('medico.whatsapp.verificar') }}', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.mostrar) return;
+            if (data.telefono) document.getElementById('wa-telefono').value = data.telefono;
+            new bootstrap.Modal(document.getElementById('modalWhatsapp'), { keyboard: false, backdrop: 'static' }).show();
+        })
+        .catch(() => {});
+
+    function guardarPreferencia(acepta) {
+        const telefono = document.getElementById('wa-telefono').value.trim();
+        fetch('{{ route('medico.whatsapp.preferencia') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            },
+            body: JSON.stringify({ telefono: telefono, acepta: acepta }),
+        }).finally(() => {
+            bootstrap.Modal.getInstance(document.getElementById('modalWhatsapp'))?.hide();
+        });
+    }
+
+    document.getElementById('wa-si')?.addEventListener('click', () => guardarPreferencia(true));
+    document.getElementById('wa-no')?.addEventListener('click', () => guardarPreferencia(false));
+});
+</script>
 
 {{-- Modal evaluación burnout --}}
 @include('burnout.encuesta-modal')

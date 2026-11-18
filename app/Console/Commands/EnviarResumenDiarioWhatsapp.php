@@ -56,7 +56,7 @@ class EnviarResumenDiarioWhatsapp extends Command
             return self::FAILURE;
         }
 
-        $ok = WhatsappService::enviar($destino, $mensaje);
+        $ok = WhatsappService::enviar($destino, $mensaje, ignorarOverride: true);
         $this->info($ok ? 'Resumen diario enviado.' : 'No se pudo enviar el resumen diario (revisa los logs).');
 
         return $ok ? self::SUCCESS : self::FAILURE;

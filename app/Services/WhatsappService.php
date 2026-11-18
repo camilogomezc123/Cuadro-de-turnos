@@ -2,24 +2,44 @@
 
 namespace App\Services;
 
+use App\Models\Medico;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WhatsappService
 {
     /**
+     * Envía un mensaje de WhatsApp a un médico, respetando su consentimiento
+     * (whatsapp_notificaciones) y si tiene teléfono registrado. Úsese para
+     * notificaciones dirigidas a una persona (cambios de turno, recordatorios).
+     */
+    public static function notificarMedico(?Medico $medico, string $mensaje): bool
+    {
+        if (!$medico || !$medico->telefono || !$medico->whatsapp_notificaciones) {
+            return false;
+        }
+
+        return self::enviar($medico->telefono, $mensaje);
+    }
+
+    /**
      * Envía un mensaje de WhatsApp. Soporta dos backends según WHATSAPP_DRIVER:
      * 'local' (microservicio whatsapp-web.js) o 'evolution' (Evolution API).
      * No lanza excepciones: si está apagado, desconectado o falla, solo registra
      * el error y retorna false, para no romper el flujo principal de la app.
+     *
+     * $ignorarOverride: solo para envíos deliberados a un grupo/difusión ya
+     * confirmados (p.ej. el resumen diario al grupo de la UCI); los envíos a
+     * personas individuales deben dejarlo en false para respetar el modo de
+     * prueba (WHATSAPP_TEST_OVERRIDE) mientras se valida el sistema.
      */
-    public static function enviar(?string $telefono, string $mensaje): bool
+    public static function enviar(?string $telefono, string $mensaje, bool $ignorarOverride = false): bool
     {
         if (!config('services.whatsapp.activo') || !$telefono) {
             return false;
         }
 
-        if ($override = config('services.whatsapp.test_override')) {
+        if (!$ignorarOverride && ($override = config('services.whatsapp.test_override'))) {
             $mensaje = "[a {$telefono}] {$mensaje}";
             $telefono = $override;
         }
