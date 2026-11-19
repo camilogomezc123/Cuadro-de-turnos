@@ -114,7 +114,11 @@ class WhatsappService
         if ($ultimoEnvio) {
             $segundosDesdeUltimo = now()->diffInSeconds(\Illuminate\Support\Carbon::parse($ultimoEnvio));
             if ($segundosDesdeUltimo < $intervaloMinimo) {
-                sleep($intervaloMinimo - $segundosDesdeUltimo);
+                // Tope de espera de 5s: un sleep() largo aquí bloquea la petición HTTP
+                // entrante y puede chocar con el timeout de nginx/php-fpm (ya pasó: un
+                // envío legítimo se perdió por esto). Mejor ceder algo de espaciado que
+                // arriesgar la entrega.
+                sleep(min($intervaloMinimo - $segundosDesdeUltimo, 5));
             }
         }
 
