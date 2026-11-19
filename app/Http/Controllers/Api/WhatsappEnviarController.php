@@ -23,17 +23,23 @@ class WhatsappEnviarController extends Controller
         }
 
         $datos = $request->validate([
-            'telefono'    => ['required', 'string', 'max:50'],
-            'mensaje'     => ['nullable', 'string', 'max:4096'],
-            'imagen_url'  => ['nullable', 'url', 'max:2048'],
+            'telefono'       => ['required', 'string', 'max:50'],
+            'mensaje'        => ['nullable', 'string', 'max:4096'],
+            'imagen_url'     => ['nullable', 'url', 'max:2048'],
+            // Alternativa cuando la imagen no tiene URL pública (p.ej. archivo privado de
+            // Drive): el contenido de la imagen codificado en base64. Evolution API acepta
+            // el campo "media" como URL o como base64, así que se envía igual.
+            'imagen_base64'  => ['nullable', 'string'],
         ]);
 
         if (!empty($datos['imagen_url'])) {
             $ok = WhatsappService::enviarImagen($datos['telefono'], $datos['imagen_url'], $datos['mensaje'] ?? '');
+        } elseif (!empty($datos['imagen_base64'])) {
+            $ok = WhatsappService::enviarImagen($datos['telefono'], $datos['imagen_base64'], $datos['mensaje'] ?? '');
         } elseif (!empty($datos['mensaje'])) {
             $ok = WhatsappService::enviar($datos['telefono'], $datos['mensaje']);
         } else {
-            return response()->json(['ok' => false, 'error' => 'Falta mensaje o imagen_url.'], 422);
+            return response()->json(['ok' => false, 'error' => 'Falta mensaje, imagen_url o imagen_base64.'], 422);
         }
 
         return response()->json(['ok' => $ok], $ok ? 200 : 502);
