@@ -418,6 +418,7 @@ class CambioTurnoController extends Controller
             'MTN' => [
                 ['valor'=>'MTN', 'label'=>'MTN completo — todo el día (24h)'],
                 ['valor'=>'MT',  'label'=>'MT — mañana + tarde (12h)'],
+                ['valor'=>'M',   'label'=>'Solo M — mañana (6h)'],
                 ['valor'=>'T',   'label'=>'Solo T — tarde (6h)'],
                 ['valor'=>'N',   'label'=>'Solo N — noche (12h)'],
             ],
@@ -439,7 +440,7 @@ class CambioTurnoController extends Controller
         $tabla = [
             'MT'  => ['M'=>'T',   'T'=>'M',    'MT'=>'LIBRE'],
             'TN'  => ['T'=>'N',   'N'=>'T',    'TN'=>'LIBRE'],
-            'MTN' => ['T'=>'MN',  'N'=>'MT',   'MT'=>'N',   'MTN'=>'LIBRE'],
+            'MTN' => ['M'=>'TN',  'T'=>'MN',  'N'=>'MT',   'MT'=>'N',   'MTN'=>'LIBRE'],
             'MN'  => ['M'=>'N',   'N'=>'M',    'MN'=>'LIBRE'],
             'M'   => ['M'=>'LIBRE'],
             'T'   => ['T'=>'LIBRE'],
